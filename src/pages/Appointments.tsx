@@ -45,7 +45,7 @@ export default function Appointments() {
     const p = appt.expand.patient
     const dateFormatted = new Date(appt.date_time).toLocaleString('pt-BR')
 
-    const msg = `Olá ${p.parent_name || 'Responsável'}! Lembrete da consulta de ${p.full_name} na Clínica de Pediatria no dia ${dateFormatted}. Favor confirmar.`
+    const msg = `Olá, ${p.parent_name || 'Responsável'}! Aqui é da equipe Cliap (Pediatria e Imunização). Lembrete da consulta de ${p.full_name} no dia ${dateFormatted}. Favor confirmar. Atenciosamente, Equipe Cliap.`
     window.open(buildWhatsAppLink(p.phone, msg), '_blank')
 
     await updateAppointment(appt.id, { reminder_generated: true, status: 'confirmado' })
@@ -78,7 +78,7 @@ export default function Appointments() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Agenda de Consultas e Vacinas</h2>
-          <p className="text-sm text-slate-500">Gestão completa dos horários da clínica</p>
+          <p className="text-sm text-slate-500">Gestão completa dos horários da Cliap</p>
         </div>
         <Button
           onClick={() => {

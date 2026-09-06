@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Cross, Lock, Mail, User, Loader2 } from 'lucide-react'
+import { Lock, Mail, User, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/use-auth'
 import { getErrorMessage } from '@/lib/pocketbase/errors'
+import { CliapLogo } from '@/components/CliapLogo'
 
 export default function Signup() {
   const [name, setName] = useState('')
@@ -44,33 +45,32 @@ export default function Signup() {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
-      <div className="md:w-1/2 bg-gradient-to-br from-[#0f3d3e] to-[#145a5a] text-white p-8 md:p-12 flex flex-col justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-800 text-teal-300">
-            <Cross className="h-6 w-6" />
-          </div>
-          <div>
-            <span className="block text-lg font-bold">Clínica de Pediatria</span>
-            <span className="block text-xs text-teal-200">e Imunização Pediátrica</span>
-          </div>
+      <div className="md:w-1/2 bg-gradient-to-br from-[#1F3A4D] via-[#2A4B63] to-[#44586C] text-white p-8 md:p-12 flex flex-col justify-between">
+        <div>
+          <CliapLogo variant="dark" iconSize="h-11 w-11" />
         </div>
 
         <div className="my-12 md:my-auto max-w-md space-y-4">
           <h2 className="text-3xl font-extrabold">Cadastro de Profissional</h2>
           <p className="text-slate-200 text-sm">
-            Crie sua conta corporativa para gerenciar pacientes, agendamentos e automação de
-            orientações médicas.
+            Crie sua conta na equipe Cliap para gerenciar prontuários, carteira de vacinação,
+            agendamentos e automação de orientações pediátricas via WhatsApp.
           </p>
         </div>
 
-        <div className="text-xs text-teal-300/80">© Clínica de Pediatria e Imunização</div>
+        <div className="text-xs text-slate-300/80">© Cliap • Pediatria e Imunização</div>
       </div>
 
       <div className="md:w-1/2 flex items-center justify-center p-6 md:p-12 bg-white">
         <div className="w-full max-w-md space-y-6">
           <div>
+            <div className="md:hidden mb-6">
+              <CliapLogo iconSize="h-10 w-10" />
+            </div>
             <h3 className="text-2xl font-bold text-slate-900">Criar Nova Conta</h3>
-            <p className="mt-1 text-sm text-slate-500">Preencha os dados do profissional</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Preencha os dados do profissional da Cliap
+            </p>
           </div>
 
           {errorMsg && (
@@ -104,7 +104,7 @@ export default function Signup() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu.email@clinica.com"
+                  placeholder="seu.email@cliap.com.br"
                   className="pl-9"
                   required
                 />
@@ -146,7 +146,7 @@ export default function Signup() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#145a5a] hover:bg-[#1f7a7a] text-white font-medium py-2.5 rounded-lg"
+              className="w-full bg-[#1F3A4D] hover:bg-[#2A4B63] text-white font-medium py-2.5 rounded-lg shadow-sm"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Criar Conta e Acessar
@@ -155,7 +155,7 @@ export default function Signup() {
 
           <div className="text-center pt-2 text-xs text-slate-500">
             Já possui conta?{' '}
-            <Link to="/login" className="text-teal-800 font-semibold hover:underline">
+            <Link to="/login" className="text-[#1F3A4D] font-semibold hover:underline">
               Fazer Login
             </Link>
           </div>

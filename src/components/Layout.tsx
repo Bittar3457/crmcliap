@@ -17,7 +17,7 @@ export default function Layout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const location = useLocation()
 
-  let title = 'CRM Pediatria'
+  let title = 'Cliap Pediatria'
   for (const [path, t] of Object.entries(pageTitles)) {
     if (location.pathname.startsWith(path)) {
       title = t
@@ -43,7 +43,7 @@ export default function Layout() {
           <Outlet />
         </main>
         <footer className="py-4 px-6 text-center text-xs text-slate-400 border-t border-slate-200/60 bg-white/50">
-          © Clínica de Pediatria e Imunização • Sistema de Atendimento e Atendimento Humanizado
+          © Cliap • Pediatria e Imunização • Cuidado pediátrico e atendimento humanizado
         </footer>
       </div>
     </div>

@@ -132,44 +132,59 @@ export default function WhatsAppCenter() {
     switch (type) {
       case 'confirmacao': {
         if (apptDateStr && apptTimeStr) {
-          return `${parentName} Tudo bem?
+          return `Olá, ${parentName}! Tudo bem?
 
-Estamos entrando em contato da Clínica de Pediatria e Imunização para confirmar a consulta de ${patientName} agendada para ${apptDateStr} às ${apptTimeStr}.
+Aqui é da equipe Cliap (Pediatria e Imunização). Estamos entrando em contato para confirmar a consulta de ${patientName} agendada para ${apptDateStr} às ${apptTimeStr}.
 
-Poderia, por gentileza, nos confirmar se podemos manter o agendamento? Responda SIM para confirmar ou nos avise caso necessite remarcar. Obrigado!`
+Poderia, por gentileza, nos confirmar se podemos manter o agendamento? Responda SIM para confirmar ou nos avise caso necessite remarcar.
+
+Atenciosamente,
+Equipe Cliap • Pediatria e Imunização`
         }
-        return `${parentName} Tudo bem?
+        return `Olá, ${parentName}! Tudo bem?
 
-Estamos entrando em contato da Clínica de Pediatria e Imunização para confirmar o agendamento de consulta de ${patientName}.
+Aqui é da equipe Cliap (Pediatria e Imunização). Estamos entrando em contato para confirmar o agendamento da consulta de ${patientName}.
 
-Poderia nos confirmar sua disponibilidade para mantermos o horário? Obrigado!`
+Poderia nos confirmar sua disponibilidade para mantermos o horário?
+
+Atenciosamente,
+Equipe Cliap • Pediatria e Imunização`
       }
 
       case 'lembrete': {
         if (apptDateStr && apptTimeStr) {
-          return `${parentName} Tudo bem?
+          return `Olá, ${parentName}! Tudo bem?
 
-Lembramos que a consulta de ${patientName} na Clínica de Pediatria e Imunização está agendada para ${apptDateStr} às ${apptTimeStr}.
+Lembramos que a consulta de ${patientName} na Cliap Pediatria e Imunização está agendada para ${apptDateStr} às ${apptTimeStr}.
 
-Pedimos a gentileza de chegar com 10 minutos de antecedência e trazer a carteira de vacinação. Caso ocorra algum imprevisto, favor nos avisar com antecedência. Até breve!`
+Pedimos a gentileza de chegar com 10 minutos de antecedência e trazer a carteirinha de vacinação. Caso ocorra algum imprevisto, favor nos avisar com antecedência. Até breve!
+
+Atenciosamente,
+Equipe Cliap • Pediatria e Imunização`
         }
-        return `${parentName} Tudo bem?
+        return `Olá, ${parentName}! Tudo bem?
 
-Lembramos da consulta de ${patientName} na Clínica de Pediatria e Imunização.
+Lembramos da consulta de ${patientName} na Cliap Pediatria e Imunização.
 
-Por gentileza, lembre-se de trazer a carteirinha de vacinação e documentos. Em caso de imprevistos, pedimos que nos avise com antecedência. Estamos à disposição!`
+Por gentileza, lembre-se de trazer a carteirinha de vacinação e documentos. Em caso de imprevistos, pedimos que nos avise com antecedência. Estamos à total disposição!
+
+Atenciosamente,
+Equipe Cliap • Pediatria e Imunização`
       }
 
       case 'orientacao': {
         if (instructionId) {
           const inst = instructions.find((i) => i.id === instructionId)
           if (inst) {
-            return `${parentName}\n\nSeguem as orientações da Clínica de Pediatria para ${patientName}:\n\n${inst.content}\n\nQualquer dúvida, nossa equipe está à disposição!`
+            return `Olá, ${parentName}!\n\nSeguem as orientações de cuidados da Cliap para ${patientName}:\n\n${inst.content}\n\nQualquer dúvida, nossa equipe está sempre à disposição!\n\nAtenciosamente,\nEquipe Cliap • Pediatria e Imunização`
           }
         }
-        return `${parentName} Seguem as orientações de atendimento e cuidados pediátricos para ${patientName}.
+        return `Olá, ${parentName}! Seguem as orientações de atendimento e cuidados pediátricos da Cliap para ${patientName}.
 
-Qualquer dúvida ou intercorrência, nossa equipe está à total disposição para auxiliar!`
+Qualquer dúvida ou intercorrência, nossa equipe está à total disposição para auxiliar!
+
+Atenciosamente,
+Equipe Cliap • Pediatria e Imunização`
       }
 
       case 'livre':

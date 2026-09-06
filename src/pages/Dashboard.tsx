@@ -75,7 +75,7 @@ export default function Dashboard() {
       timeStyle: 'short',
     })
 
-    const messageText = `Olá ${patient.parent_name || 'Responsável'}! Lembrete de agendamento na Clínica de Pediatria para ${patient.full_name}:\n- Data/Hora: ${dateFormatted}\n- Tipo: ${appt.type}\nPor favor, confirme respondendo este mensagem!`
+    const messageText = `Olá, ${patient.parent_name || 'Responsável'}! Aqui é da equipe Cliap (Pediatria e Imunização). Lembrete de agendamento para ${patient.full_name}:\n- Data/Hora: ${dateFormatted}\n- Tipo: ${appt.type}\nPor favor, confirme respondendo esta mensagem!\n\nAtenciosamente,\nEquipe Cliap`
 
     window.open(buildWhatsAppLink(patient.phone, messageText), '_blank')
 

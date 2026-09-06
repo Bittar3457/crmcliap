@@ -67,7 +67,7 @@ export default function PatientDetail() {
   }
 
   const handleOpenWhatsApp = () => {
-    const text = `Olá ${patient.parent_name || 'Responsável'}, como está o(a) ${patient.full_name}? Entramos em contato da Clínica de Pediatria.`
+    const text = `Olá, ${patient.parent_name || 'Responsável'}! Como está o(a) ${patient.full_name}? Entramos em contato da Cliap • Pediatria e Imunização.`
     window.open(buildWhatsAppLink(patient.phone, text), '_blank')
   }
 

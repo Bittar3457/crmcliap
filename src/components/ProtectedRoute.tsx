@@ -7,10 +7,10 @@ export function ProtectedRoute() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="text-center space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin text-teal-800 mx-auto" />
-          <p className="text-sm font-medium text-slate-600">Carregando sistema CRM...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-[#1F3A4D] mx-auto" />
+          <p className="text-sm font-medium text-slate-600">Carregando CRM Cliap...</p>
         </div>
       </div>
     )

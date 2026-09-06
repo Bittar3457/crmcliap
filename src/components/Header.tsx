@@ -37,7 +37,7 @@ export function Header({ title, onOpenMobileNav }: HeaderProps) {
           >
             <Menu className="h-5 w-5 text-slate-700" />
           </Button>
-          <h1 className="text-lg md:text-xl font-semibold text-slate-800 tracking-tight">
+          <h1 className="text-lg md:text-xl font-semibold text-[#1F3A4D] tracking-tight">
             {title}
           </h1>
         </div>
@@ -67,7 +67,7 @@ export function Header({ title, onOpenMobileNav }: HeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
                 <Avatar className="h-9 w-9 border border-slate-200">
-                  <AvatarFallback className="bg-emerald-800 text-white font-medium text-xs">
+                  <AvatarFallback className="bg-[#1F3A4D] text-white font-medium text-xs">
                     {userInitial}
                   </AvatarFallback>
                 </Avatar>

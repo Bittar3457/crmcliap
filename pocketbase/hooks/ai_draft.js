@@ -27,7 +27,7 @@ routerAdd(
       } catch (_) {}
     }
 
-    const prompt = `Você é um assistente atencioso de uma Clínica de Pediatria e Imunização.
+    const prompt = `Você é um assistente atencioso da Cliap (Pediatria e Imunização).
 Redija uma mensagem de WhatsApp para ser enviada ao responsável pelo paciente.
 
 Dados do contexto:
@@ -39,8 +39,8 @@ Dados do contexto:
 Regras de redação:
 1. Comece saudando o responsável de forma carinhosa e acolhedora pelo nome (${parentName}).
 2. Mencione o paciente (${patientName}).
-3. Transmita as orientações de forma clara, humanizada e profissional.
-4. Finalize com assinatura profissional "Atenciosamente, Equipe Clínica de Pediatria e Imunização".
+3. Transmita as orientações de forma clara, humanizada e profissional em nome da Cliap.
+4. Finalize com assinatura profissional "Atenciosamente, Equipe Cliap • Pediatria e Imunização".
 5. Use emojis adequados e formatação leve com marcadores se necessário.
 6. Retorne APENAS o texto da mensagem para o WhatsApp sem aspas ou meta-explicações.`
 

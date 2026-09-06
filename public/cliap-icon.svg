@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <style>
+      .slate { fill: #44586C; }
+      .terracotta { fill: #B06A5E; }
+      .sage { fill: #8A9A82; }
+    </style>
+  </defs>
+  <!-- Top slate-blue circle -->
+  <circle cx="50" cy="22" r="14" class="slate" />
+  
+  <!-- Left terracotta petal/leaf with blend mode -->
+  <!-- Curving up from bottom center around (50, 85) to left top (26, 38) -->
+  <path d="M 50 82 C 40 80, 26 64, 25 43 C 38 41, 48 49, 52 74 Z" class="terracotta" />
+  
+  <!-- Right sage green petal/leaf overlapping with blend mode -->
+  <path d="M 46 75 C 47 48, 59 39, 74 38 C 76 60, 62 78, 50 82 Z" class="sage" style="mix-blend-mode: multiply; opacity: 0.95;" />
+</svg>

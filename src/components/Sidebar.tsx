@@ -6,12 +6,12 @@ import {
   Syringe,
   BookOpen,
   MessageSquare,
-  Cross,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
+import { CliapLogo } from './CliapLogo'
 
 interface SidebarProps {
   onItemClick?: () => void
@@ -32,17 +32,9 @@ export function Sidebar({ onItemClick }: SidebarProps) {
 
   return (
     <aside className="flex h-full w-64 flex-col bg-white border-r border-slate-200">
-      <div className="flex h-16 items-center px-6 border-b border-slate-100">
-        <Link to="/painel" className="flex items-center space-x-3" onClick={onItemClick}>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-800 text-white shadow-sm">
-            <Cross className="h-5 w-5" />
-          </div>
-          <div>
-            <span className="block text-sm font-bold text-slate-900 leading-tight">
-              Clínica Pediatria
-            </span>
-            <span className="block text-[11px] font-medium text-teal-800">e Imunização</span>
-          </div>
+      <div className="flex h-20 items-center px-5 border-b border-slate-100">
+        <Link to="/painel" className="w-full" onClick={onItemClick}>
+          <CliapLogo iconSize="h-10 w-10" />
         </Link>
       </div>
 
@@ -59,17 +51,17 @@ export function Sidebar({ onItemClick }: SidebarProps) {
               className={cn(
                 'group flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 relative',
                 isActive
-                  ? 'bg-teal-50 text-teal-900 font-semibold'
+                  ? 'bg-[#1F3A4D]/10 text-[#1F3A4D] font-semibold'
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
               )}
             >
               {isActive && (
-                <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-teal-800" />
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-[#1F3A4D]" />
               )}
               <Icon
                 className={cn(
                   'mr-3 h-5 w-5 transition-colors',
-                  isActive ? 'text-teal-800' : 'text-slate-400 group-hover:text-slate-600',
+                  isActive ? 'text-[#1F3A4D]' : 'text-slate-400 group-hover:text-slate-600',
                 )}
               />
               {item.label}
