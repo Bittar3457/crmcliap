@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
   MessageSquare,
@@ -10,11 +10,15 @@ import {
   CheckCircle,
   Loader2,
   FileText,
+  Settings2,
+  RotateCcw,
+  Edit3,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -26,12 +30,26 @@ import { getPatients } from '@/services/patients'
 import { getCareInstructions } from '@/services/care-instructions'
 import { getAppointments } from '@/services/appointments'
 import { getWhatsAppMessages, createWhatsAppMessage, generateAiDraft } from '@/services/whatsapp'
-import type { Patient, CareInstruction, WhatsAppMessage, Appointment } from '@/types/crm'
+import { getMessageTemplates } from '@/services/message-templates'
+import type {
+  Patient,
+  CareInstruction,
+  WhatsAppMessage,
+  Appointment,
+  MessageTemplate,
+  MessageTemplateType,
+} from '@/types/crm'
 import { buildWhatsAppLink, formatPhoneNumber } from '@/lib/whatsapp-utils'
+import {
+  interpolateTemplate,
+  buildTemplateContext,
+  DEFAULT_FALLBACK_TEMPLATES,
+} from '@/lib/template-interpolator'
+import { TemplateEditorModal } from '@/components/TemplateEditorModal'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from '@/components/ui/use-toast'
 
-export type MessageType = 'confirmacao' | 'lembrete' | 'orientacao' | 'livre'
+export type MessageType = MessageTemplateType
 
 export default function WhatsAppCenter() {
   const location = useLocation()
@@ -41,6 +59,7 @@ export default function WhatsAppCenter() {
   const [instructions, setInstructions] = useState<CareInstruction[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [messages, setMessages] = useState<WhatsAppMessage[]>([])
+  const [templates, setTemplates] = useState<MessageTemplate[]>([])
 
   const [messageType, setMessageType] = useState<MessageType>(
     stateNav?.instructionId ? 'orientacao' : 'confirmacao',
@@ -54,25 +73,28 @@ export default function WhatsAppCenter() {
 
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [isEditorModalOpen, setIsEditorModalOpen] = useState(false)
 
   const loadInitialData = async () => {
     try {
-      const [pList, iList, aList, mList] = await Promise.all([
+      const [pList, iList, aList, mList, tList] = await Promise.all([
         getPatients(),
         getCareInstructions(),
         getAppointments(),
         getWhatsAppMessages(),
+        getMessageTemplates(),
       ])
       setPatients(pList)
       setInstructions(iList)
       setAppointments(aList)
       setMessages(mList)
+      setTemplates(tList)
 
       if (!selectedPatientId && pList.length > 0) {
         setSelectedPatientId(pList[0].id)
       }
     } catch (err) {
-      console.error(err)
+      console.error('Erro ao carregar dados do Centro de WhatsApp:', err)
     }
   }
 
@@ -85,112 +107,60 @@ export default function WhatsAppCenter() {
   })
 
   // Retorna a próxima consulta agendada ou confirmada do paciente selecionado
-  const getNextAppointment = (patientId: string) => {
-    if (!patientId) return null
-    const patientAppts = appointments
-      .filter(
-        (a) =>
-          a.patient === patientId &&
-          (a.status === 'agendado' || a.status === 'confirmado') &&
-          new Date(a.date_time).getTime() >= Date.now() - 1000 * 60 * 60 * 24, // últimas 24h em diante
+  const getNextAppointment = useCallback(
+    (patientId: string) => {
+      if (!patientId) return null
+      const patientAppts = appointments
+        .filter(
+          (a) =>
+            a.patient === patientId &&
+            (a.status === 'agendado' || a.status === 'confirmado') &&
+            new Date(a.date_time).getTime() >= Date.now() - 1000 * 60 * 60 * 24, // últimas 24h em diante
+        )
+        .sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime())
+      return (
+        patientAppts[0] ||
+        appointments
+          .filter((a) => a.patient === patientId)
+          .sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime())[0] ||
+        null
       )
-      .sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime())
-    return (
-      patientAppts[0] ||
-      appointments
-        .filter((a) => a.patient === patientId)
-        .sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime())[0] ||
-      null
-    )
-  }
+    },
+    [appointments],
+  )
 
-  // Gera o template de acordo com o tipo e paciente selecionado
-  const generateTemplateText = (
-    type: MessageType,
-    patientId: string,
-    instructionId: string = selectedInstructionId,
-  ): string => {
-    const patient = patients.find((p) => p.id === patientId)
-    const patientName = patient?.full_name || 'o paciente'
-    const parentName = patient?.parent_name ? `Olá, ${patient.parent_name}!` : 'Olá!'
-    const nextAppt = getNextAppointment(patientId)
+  // Gera o texto interpolado a partir do template gravado no PocketBase (ou fallback no código)
+  const generateTemplateText = useCallback(
+    (
+      type: MessageType,
+      patientId: string,
+      instructionId: string = selectedInstructionId,
+    ): string => {
+      const patient = patients.find((p) => p.id === patientId) || null
+      const nextAppt = getNextAppointment(patientId)
+      const instruction = instructionId
+        ? instructions.find((i) => i.id === instructionId) || null
+        : null
 
-    const apptDateStr = nextAppt
-      ? new Date(nextAppt.date_time).toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        })
-      : null
-    const apptTimeStr = nextAppt
-      ? new Date(nextAppt.date_time).toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : null
+      // Busca template persistido no banco
+      const matchedTemplate = templates.find((t) => t.type === type)
+      const rawTemplate =
+        matchedTemplate?.content !== undefined
+          ? matchedTemplate.content
+          : DEFAULT_FALLBACK_TEMPLATES[type]
 
-    switch (type) {
-      case 'confirmacao': {
-        if (apptDateStr && apptTimeStr) {
-          return `Olá, ${parentName}! Tudo bem?
+      if (!rawTemplate) return ''
 
-Aqui é da equipe Cliap (Pediatria e Imunização). Estamos entrando em contato para confirmar a consulta de ${patientName} agendada para ${apptDateStr} às ${apptTimeStr}.
+      const context = buildTemplateContext({
+        patient,
+        appointment: nextAppt,
+        instruction,
+      })
 
-Poderia, por gentileza, nos confirmar se podemos manter o agendamento? Responda SIM para confirmar ou nos avise caso necessite remarcar.
-
-Atenciosamente,
-Equipe Cliap • Pediatria e Imunização`
-        }
-        return `Olá, ${parentName}! Tudo bem?
-
-Aqui é da equipe Cliap (Pediatria e Imunização). Estamos entrando em contato para confirmar o agendamento da consulta de ${patientName}.
-
-Poderia nos confirmar sua disponibilidade para mantermos o horário?
-
-Atenciosamente,
-Equipe Cliap • Pediatria e Imunização`
-      }
-
-      case 'lembrete': {
-        if (apptDateStr && apptTimeStr) {
-          return `Olá, ${parentName}! Tudo bem?
-
-Lembramos que a consulta de ${patientName} na Cliap Pediatria e Imunização está agendada para ${apptDateStr} às ${apptTimeStr}.
-
-Pedimos a gentileza de chegar com 10 minutos de antecedência e trazer a carteirinha de vacinação. Caso ocorra algum imprevisto, favor nos avisar com antecedência. Até breve!
-
-Atenciosamente,
-Equipe Cliap • Pediatria e Imunização`
-        }
-        return `Olá, ${parentName}! Tudo bem?
-
-Lembramos da consulta de ${patientName} na Cliap Pediatria e Imunização.
-
-Por gentileza, lembre-se de trazer a carteirinha de vacinação e documentos. Em caso de imprevistos, pedimos que nos avise com antecedência. Estamos à total disposição!
-
-Atenciosamente,
-Equipe Cliap • Pediatria e Imunização`
-      }
-
-      case 'orientacao': {
-        if (instructionId) {
-          const inst = instructions.find((i) => i.id === instructionId)
-          if (inst) {
-            return `Olá, ${parentName}!\n\nSeguem as orientações de cuidados da Cliap para ${patientName}:\n\n${inst.content}\n\nQualquer dúvida, nossa equipe está sempre à disposição!\n\nAtenciosamente,\nEquipe Cliap • Pediatria e Imunização`
-          }
-        }
-        return `Olá, ${parentName}! Seguem as orientações de atendimento e cuidados pediátricos da Cliap para ${patientName}.
-
-Qualquer dúvida ou intercorrência, nossa equipe está à total disposição para auxiliar!
-
-Atenciosamente,
-Equipe Cliap • Pediatria e Imunização`
-      }
-
-      case 'livre':
-        return ''
-    }
-  }
+      return interpolateTemplate(rawTemplate, context)
+    },
+    [patients, instructions, templates, selectedInstructionId, getNextAppointment],
+  )
 
   // Mudança do tipo de mensagem
   const handleTypeChange = (newType: MessageType) => {
@@ -217,6 +187,24 @@ Equipe Cliap • Pediatria e Imunização`
     }
   }
 
+  // Recarregar texto com template atual
+  const handleResetToTemplate = () => {
+    const text = generateTemplateText(messageType, selectedPatientId, selectedInstructionId)
+    setMessageContent(text)
+    toast({
+      title: 'Mensagem atualizada',
+      description: 'Texto recarregado a partir do modelo gravado no banco.',
+    })
+  }
+
+  // Callback chamado ao salvar novos templates no banco
+  const handleTemplatesUpdated = (updatedList: MessageTemplate[]) => {
+    setTemplates(updatedList)
+    // Atualiza o texto do tipo atualmente ativo
+    const updated = generateTemplateText(messageType, selectedPatientId, selectedInstructionId)
+    setMessageContent(updated)
+  }
+
   // Preenchimento inicial assim que carregar dados ou se vier via navegação
   useEffect(() => {
     if (patients.length > 0 && selectedPatientId && !messageContent) {
@@ -227,7 +215,7 @@ Equipe Cliap • Pediatria e Imunização`
       )
       setMessageContent(initialText)
     }
-  }, [patients, selectedPatientId])
+  }, [patients, selectedPatientId, templates])
 
   const handleGenerateAiDraft = async () => {
     if (!selectedPatientId) {
@@ -310,23 +298,46 @@ Equipe Cliap • Pediatria e Imunização`
 
   const currentPatient = patients.find((p) => p.id === selectedPatientId)
 
+  const currentTemplate = templates.find((t) => t.type === messageType)
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Centro de Mensagens WhatsApp</h2>
-        <p className="text-sm text-slate-500">
-          Redação assistida por IA e envio direto via deep link oficial do WhatsApp
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Centro de Mensagens WhatsApp</h2>
+          <p className="text-sm text-slate-500">
+            Redação assistida por IA, templates gravados e envio direto via deep link oficial
+          </p>
+        </div>
+
+        <Button
+          onClick={() => setIsEditorModalOpen(true)}
+          variant="outline"
+          className="border-[#1F3A4D]/30 text-[#1F3A4D] hover:bg-[#1F3A4D]/10 font-medium self-start sm:self-auto flex items-center gap-2"
+        >
+          <Settings2 className="h-4 w-4 text-[#1F3A4D]" />
+          Editar Modelos de Mensagem
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7 space-y-4">
           <Card className="border-slate-200 shadow-subtle">
             <CardHeader className="pb-3 border-b">
-              <CardTitle className="text-base font-bold text-slate-800 flex items-center">
-                <MessageSquare className="h-4 w-4 mr-2 text-teal-800" />
-                Composição de Mensagem
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-bold text-slate-800 flex items-center">
+                  <MessageSquare className="h-4 w-4 mr-2 text-teal-800" />
+                  Composição de Mensagem
+                </CardTitle>
+                <button
+                  type="button"
+                  onClick={() => setIsEditorModalOpen(true)}
+                  className="text-xs font-semibold text-[#1F3A4D] hover:underline flex items-center gap-1"
+                >
+                  <Edit3 className="h-3 w-3" />
+                  Gerenciar textos dos 4 tipos
+                </button>
+              </div>
             </CardHeader>
             <CardContent className="p-5 space-y-4">
               <div className="space-y-1.5">
@@ -353,29 +364,48 @@ Equipe Cliap • Pediatria e Imunização`
                     <SelectItem value="confirmacao">
                       <div className="flex items-center gap-2">
                         <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-                        <span>Confirmação (Próxima Consulta)</span>
+                        <span className="font-medium">Confirmação</span>
+                        <span className="text-xs text-slate-400">— Próxima Consulta</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="lembrete">
                       <div className="flex items-center gap-2">
                         <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
-                        <span>Lembrete (Horário e Recomendações)</span>
+                        <span className="font-medium">Lembrete</span>
+                        <span className="text-xs text-slate-400">— Horário e Recomendações</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="orientacao">
                       <div className="flex items-center gap-2">
                         <span className="inline-block w-2 h-2 rounded-full bg-purple-500" />
-                        <span>Orientação (Biblioteca de Cuidados)</span>
+                        <span className="font-medium">Orientação</span>
+                        <span className="text-xs text-slate-400">— Biblioteca de Cuidados</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="livre">
                       <div className="flex items-center gap-2">
                         <span className="inline-block w-2 h-2 rounded-full bg-slate-400" />
-                        <span>Livre (Texto em branco / Personalizado)</span>
+                        <span className="font-medium">Livre</span>
+                        <span className="text-xs text-slate-400">— Personalizado / Avulso</span>
                       </div>
                     </SelectItem>
                   </SelectContent>
                 </Select>
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+                  <span className="truncate">
+                    Modelo ativo:{' '}
+                    <strong className="text-slate-700 font-semibold">
+                      {currentTemplate?.title || 'Padrão do Sistema'}
+                    </strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditorModalOpen(true)}
+                    className="text-teal-700 hover:text-teal-900 underline font-medium"
+                  >
+                    Editar texto deste tipo
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -458,13 +488,28 @@ Equipe Cliap • Pediatria e Imunização`
               </div>
 
               <div className="space-y-1.5 pt-2 border-t">
-                <Label htmlFor="content">Texto Final da Mensagem *</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="content" className="font-semibold text-slate-800">
+                    Texto Final da Mensagem *
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetToTemplate}
+                    className="h-6 px-2 text-[11px] text-slate-500 hover:text-slate-800"
+                    title="Recarregar o texto com o modelo padrão deste tipo"
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" /> Recarregar Modelo
+                  </Button>
+                </div>
                 <Textarea
                   id="content"
                   rows={8}
                   value={messageContent}
                   onChange={(e) => setMessageContent(e.target.value)}
                   placeholder="Digite ou edite a mensagem completa que será aberta no WhatsApp..."
+                  className="font-normal leading-relaxed"
                 />
               </div>
 
@@ -536,6 +581,15 @@ Equipe Cliap • Pediatria e Imunização`
           </Card>
         </div>
       </div>
+
+      {/* Modal para gerenciar e gravar os modelos de mensagem no banco */}
+      <TemplateEditorModal
+        open={isEditorModalOpen}
+        onOpenChange={setIsEditorModalOpen}
+        templates={templates}
+        onTemplatesUpdated={handleTemplatesUpdated}
+        initialType={messageType}
+      />
     </div>
   )
 }

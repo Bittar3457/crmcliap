@@ -93,3 +93,16 @@ export interface WhatsAppMessage {
     template?: CareInstruction
   }
 }
+
+export type MessageTemplateType = 'confirmacao' | 'lembrete' | 'orientacao' | 'livre'
+
+export interface MessageTemplate {
+  id: string
+  type: MessageTemplateType
+  title: string
+  content: string
+  description?: string
+  order?: number
+  created: string
+  updated: string
+}
