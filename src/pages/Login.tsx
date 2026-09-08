@@ -1,9 +1,24 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Lock, Mail, Loader2, HeartHandshake } from 'lucide-react'
+import {
+  Lock,
+  Mail,
+  Loader2,
+  HeartHandshake,
+  CheckCircle2,
+  ArrowLeft,
+  KeyRound,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/use-auth'
 import { getErrorMessage } from '@/lib/pocketbase/errors'
 import { CliapLogo } from '@/components/CliapLogo'
@@ -13,7 +28,15 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
-  const { signIn } = useAuth()
+
+  // Modal Esqueci Minha Senha
+  const [forgotOpen, setForgotOpen] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+  const [resetError, setResetError] = useState('')
+
+  const { signIn, requestPasswordReset } = useAuth()
   const navigate = useNavigate()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -77,21 +100,34 @@ export default function Login() {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-1.5">
-              <Label htmlFor="email">E-mail Corporativo</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Senha de Acesso</Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetEmail(email || '')
+                    setResetSent(false)
+                    setResetError('')
+                    setForgotOpen(true)
+                  }}
+                  className="text-xs font-semibold text-[#1F3A4D] hover:text-[#B06A5E] hover:underline transition-colors"
+                >
+                  Esqueci minha senha
+                </button>
+              </div>
               <div className="relative">
-                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu.email@cliap.com.br"
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
                   className="pl-9"
                   required
                 />
               </div>
             </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="password">Senha de Acesso</Label>
               <div className="relative">
@@ -126,6 +162,128 @@ export default function Login() {
           </div>
         </div>
       </div>
+
+      {/* Modal Esqueci Minha Senha */}
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="sm:max-w-md bg-white border-slate-200">
+          <DialogHeader className="space-y-2">
+            <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-[#1F3A4D] mb-1">
+              <KeyRound className="h-6 w-6 text-[#1F3A4D]" />
+            </div>
+            <DialogTitle className="text-xl font-bold text-center text-slate-900">
+              Recuperar Senha
+            </DialogTitle>
+            <DialogDescription className="text-center text-slate-600 text-sm">
+              Informe seu e-mail cadastrado na Cliap. Enviaremos um link seguro para você redefinir
+              sua senha.
+            </DialogDescription>
+          </DialogHeader>
+
+          {resetSent ? (
+            <div className="space-y-5 py-3">
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm space-y-2">
+                <div className="flex items-center space-x-2 font-semibold text-emerald-900">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                  <span>Instruções enviadas!</span>
+                </div>
+                <p className="text-xs text-emerald-700 leading-relaxed">
+                  Se o e-mail informado estiver cadastrado em nossa base, você receberá uma mensagem
+                  em instantes com o link seguro para cadastrar uma nova senha.
+                </p>
+                <p className="text-[11px] text-emerald-600 pt-1">
+                  Verifique também sua caixa de spam ou lixo eletrônico.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  onClick={() => setForgotOpen(false)}
+                  className="w-full bg-[#1F3A4D] hover:bg-[#2A4B63] text-white font-medium rounded-lg"
+                >
+                  Entendi e vou checar meu e-mail
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setResetSent(false)
+                    setResetError('')
+                  }}
+                  className="w-full text-xs text-slate-600 hover:text-slate-900"
+                >
+                  Tentar outro e-mail
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                setResetError('')
+                setResetLoading(true)
+
+                const { error } = await requestPasswordReset(resetEmail.trim())
+                setResetLoading(false)
+
+                // Boas práticas de segurança: sempre exibir mensagem de sucesso genérica,
+                // prevenindo enumeração de e-mails, exceto se houver erro grave de conexão.
+                if (error && error.status && error.status >= 500) {
+                  setResetError('Serviço temporariamente indisponível. Tente novamente mais tarde.')
+                } else {
+                  setResetSent(true)
+                }
+              }}
+              className="space-y-4 pt-2"
+            >
+              {resetError && (
+                <div className="p-3 text-xs rounded-lg bg-red-50 border border-red-200 text-red-700 font-medium">
+                  {resetError}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="reset-email">E-mail Cadastrado</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="seu.email@cliap.com.br"
+                    className="pl-9"
+                    required
+                    autoFocus
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500">Ex.: robertobittar98@gmail.com</p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setForgotOpen(false)}
+                  disabled={resetLoading}
+                  className="w-1/3"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-1.5" />
+                  Voltar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={resetLoading || !resetEmail.trim()}
+                  className="w-2/3 bg-[#1F3A4D] hover:bg-[#2A4B63] text-white font-medium"
+                >
+                  {resetLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Enviar Link
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

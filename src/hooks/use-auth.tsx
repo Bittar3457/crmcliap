@@ -6,6 +6,8 @@ interface AuthContextType {
   isAuthenticated: boolean
   signUp: (email: string, password: string, name?: string) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
+  requestPasswordReset: (email: string) => Promise<{ error: any }>
+  confirmPasswordReset: (token: string, password: string) => Promise<{ error: any }>
   signOut: () => void
   loading: boolean
 }
@@ -67,6 +69,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  const requestPasswordReset = async (email: string) => {
+    try {
+      await pb.collection('users').requestPasswordReset(email)
+      return { error: null }
+    } catch (error) {
+      return { error }
+    }
+  }
+
+  const confirmPasswordReset = async (token: string, password: string) => {
+    try {
+      await pb.collection('users').confirmPasswordReset(token, password, password)
+      return { error: null }
+    } catch (error) {
+      return { error }
+    }
+  }
+
   const signOut = () => {
     pb.authStore.clear()
   }
@@ -78,6 +98,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAuthenticated,
         signUp,
         signIn,
+        requestPasswordReset,
+        confirmPasswordReset,
         signOut,
         loading,
       }}
