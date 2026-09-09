@@ -1,11 +1,24 @@
 import { useState, useEffect } from 'react'
-import { Calendar as CalendarIcon, Plus, Send, CheckCircle, Clock, XCircle } from 'lucide-react'
+import {
+  Calendar as CalendarIcon,
+  Plus,
+  Send,
+  CheckCircle,
+  Clock,
+  XCircle,
+  MessageSquare,
+  Sparkles,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { getAppointments, updateAppointment } from '@/services/appointments'
-import type { Appointment, AppointmentStatus } from '@/types/crm'
+import { createWhatsAppMessage } from '@/services/whatsapp'
+import { sendInboxMessage, formatInboxTemplate } from '@/services/whatsapp-inbox'
+import { INBOX_TEMPLATES } from '@/services/mock-inbox-data'
+import type { Appointment, AppointmentStatus, Patient } from '@/types/crm'
 import { AppointmentFormModal } from '@/components/AppointmentFormModal'
-import { buildWhatsAppLink } from '@/lib/whatsapp-utils'
+import { buildWhatsAppLink, formatPhoneNumber } from '@/lib/whatsapp-utils'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from '@/components/ui/use-toast'
 
@@ -40,15 +53,71 @@ export default function Appointments() {
     }
   }
 
+  // Botão específico pedido: "Enviar confirmação por WhatsApp" que dispara o template de confirmação/lembrete
+  const handleSendWhatsAppConfirmation = async (appt: Appointment) => {
+    if (!appt.expand?.patient) {
+      toast({ title: 'Paciente não vinculado ao agendamento', variant: 'destructive' })
+      return
+    }
+
+    const patient = appt.expand.patient
+    const template =
+      INBOX_TEMPLATES.find((t) => t.type === 'confirmacao') ||
+      INBOX_TEMPLATES.find((t) => t.type === 'lembrete_24h') ||
+      INBOX_TEMPLATES[0]
+
+    const interpolated = formatInboxTemplate(template.content, {
+      patient,
+      appointment: appt,
+    })
+
+    try {
+      // Dispara via serviço de envio (abre deep link wa.me e persiste mensagem no histórico)
+      await sendInboxMessage({
+        conversationId: `conv-${patient.id}`,
+        phone: patient.phone,
+        content: interpolated,
+        patientId: patient.id,
+        senderName: 'Recepção Cliap',
+      })
+
+      // Atualiza o agendamento marcando lembrete gerado
+      await updateAppointment(appt.id, {
+        reminder_generated: true,
+      })
+
+      toast({
+        title: 'Confirmação enviada via WhatsApp!',
+        description: `Template de confirmação disparado para ${patient.parent_name || patient.full_name}.`,
+      })
+      loadAppts()
+    } catch (err) {
+      console.error(err)
+      toast({ title: 'Erro ao registrar envio', variant: 'destructive' })
+    }
+  }
+
   const handleGenerateReminder = async (appt: Appointment) => {
     if (!appt.expand?.patient) return
     const p = appt.expand.patient
-    const dateFormatted = new Date(appt.date_time).toLocaleString('pt-BR')
+    const template = INBOX_TEMPLATES.find((t) => t.type === 'lembrete_24h') || INBOX_TEMPLATES[0]
 
-    const msg = `Olá, ${p.parent_name || 'Responsável'}! Aqui é da equipe Cliap (Pediatria e Imunização). Lembrete da consulta de ${p.full_name} no dia ${dateFormatted}. Favor confirmar. Atenciosamente, Equipe Cliap.`
+    const msg = formatInboxTemplate(template.content, {
+      patient: p,
+      appointment: appt,
+    })
+
     window.open(buildWhatsAppLink(p.phone, msg), '_blank')
 
     await updateAppointment(appt.id, { reminder_generated: true, status: 'confirmado' })
+    await createWhatsAppMessage({
+      patient: p.id,
+      direction: 'enviada',
+      content: msg,
+      sent_at: new Date().toISOString(),
+      status: 'enviada',
+    }).catch(() => null)
+
     toast({ title: 'Lembrete gerado e enviado via WhatsApp!' })
     loadAppts()
   }
@@ -159,6 +228,17 @@ export default function Appointments() {
                 </div>
 
                 <div className="flex items-center space-x-2 border-t md:border-t-0 pt-2 md:pt-0">
+                  {/* Botão pedido no item 5 da especificação: "Enviar confirmação por WhatsApp" */}
+                  <Button
+                    size="sm"
+                    onClick={() => handleSendWhatsAppConfirmation(a)}
+                    className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-medium"
+                    title="Dispara o template de confirmação manualmente via deep link oficial"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                    Enviar confirmação por WhatsApp
+                  </Button>
+
                   <Button
                     size="sm"
                     variant="outline"
@@ -166,7 +246,7 @@ export default function Appointments() {
                     className="text-xs text-teal-800 border-teal-200 hover:bg-teal-50"
                   >
                     <Send className="h-3.5 w-3.5 mr-1" />
-                    Gerar Lembrete
+                    Lembrete 24h
                   </Button>
 
                   <Button

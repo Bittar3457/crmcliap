@@ -43,6 +43,18 @@ export const TEMPLATE_VARIABLES_INFO = [
     example: 'Consulta Pediátrica',
   },
   {
+    tag: '{{vacina}}',
+    label: 'Nome da Vacina',
+    description: 'Vacina com aprazamento próximo.',
+    example: 'Pentavalente',
+  },
+  {
+    tag: '{{data_vacina}}',
+    label: 'Vencimento do Aprazamento',
+    description: 'Data limite recomendada para a dose da vacina.',
+    example: '20/09/2026',
+  },
+  {
     tag: '{{orientacao}}',
     label: 'Texto da Orientação',
     description: 'Conteúdo detalhado do modelo de orientação selecionado na biblioteca.',

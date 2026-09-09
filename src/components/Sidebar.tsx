@@ -5,7 +5,8 @@ import {
   Calendar,
   Syringe,
   BookOpen,
-  MessageSquare,
+  Inbox,
+  Send,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -23,7 +24,8 @@ const navItems = [
   { label: 'Agendamentos', href: '/agendamentos', icon: Calendar },
   { label: 'Vacinações', href: '/vacinacoes', icon: Syringe },
   { label: 'Orientações', href: '/orientacoes', icon: BookOpen },
-  { label: 'WhatsApp', href: '/whatsapp', icon: MessageSquare },
+  { label: 'Inbox WhatsApp', href: '/inbox-whatsapp', icon: Inbox, badge: 'Novo' },
+  { label: 'Centro WhatsApp', href: '/whatsapp', icon: Send },
 ]
 
 export function Sidebar({ onItemClick }: SidebarProps) {
@@ -64,7 +66,12 @@ export function Sidebar({ onItemClick }: SidebarProps) {
                   isActive ? 'text-[#1F3A4D]' : 'text-slate-400 group-hover:text-slate-600',
                 )}
               />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.badge && (
+                <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-1.5 py-0.2">
+                  {item.badge}
+                </span>
+              )}
             </Link>
           )
         })}

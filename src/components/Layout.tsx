@@ -10,6 +10,7 @@ const pageTitles: Record<string, string> = {
   '/agendamentos': 'Agenda de Consultas e Vacinas',
   '/vacinacoes': 'Cartão e Registro Vacinal',
   '/orientacoes': 'Biblioteca de Orientações',
+  '/inbox-whatsapp': 'Inbox WhatsApp',
   '/whatsapp': 'Centro de Mensagens WhatsApp',
 }
 
