@@ -36,6 +36,12 @@ import { formatPhoneNumber, calculateAge, buildWhatsAppLink } from '@/lib/whatsa
 import { AppointmentFormModal } from '@/components/AppointmentFormModal'
 import { VaccinationFormModal } from '@/components/VaccinationFormModal'
 import { toast } from '@/components/ui/use-toast'
+import {
+  getWhatsAppConfig,
+  sendWhatsAppMessageApi,
+  type WhatsAppConfig,
+} from '@/services/whatsapp-api'
+import { Zap } from 'lucide-react'
 
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>()
@@ -48,6 +54,7 @@ export default function PatientDetail() {
   const [loading, setLoading] = useState(true)
   const [quickReply, setQuickReply] = useState('')
   const [sendingMsg, setSendingMsg] = useState(false)
+  const [waConfig, setWaConfig] = useState<WhatsAppConfig | null>(null)
 
   const [apptModalOpen, setApptModalOpen] = useState(false)
   const [vacModalOpen, setVacModalOpen] = useState(false)
@@ -55,14 +62,16 @@ export default function PatientDetail() {
   const loadAll = async () => {
     if (!id) return
     try {
-      const [p, appts, vacs] = await Promise.all([
+      const [p, appts, vacs, cfg] = await Promise.all([
         getPatient(id),
         getAppointmentsForPatient(id),
         getVaccinationsForPatient(id),
+        getWhatsAppConfig().catch(() => null),
       ])
       setPatient(p)
       setAppointments(appts)
       setVaccinations(vacs)
+      if (cfg) setWaConfig(cfg)
 
       if (p) {
         const msgs = await getConversationMessages(`conv-${p.id}`, p.phone, p.id)
@@ -115,10 +124,17 @@ export default function PatientDetail() {
       })
       setMessages((prev) => [...prev, sent])
       setQuickReply('')
-      toast({
-        title: 'Mensagem enviada via WhatsApp!',
-        description: 'Gravada no prontuário e aberta no WhatsApp oficial.',
-      })
+      if (waConfig?.status === 'conectado') {
+        toast({
+          title: 'Mensagem enviada via WhatsApp Cloud API!',
+          description: 'Gravada no prontuário e entregue pela Meta.',
+        })
+      } else {
+        toast({
+          title: 'Mensagem enviada via WhatsApp!',
+          description: 'Gravada no prontuário e aberta no WhatsApp oficial.',
+        })
+      }
     } catch {
       toast({ title: 'Erro ao enviar mensagem', variant: 'destructive' })
     } finally {
@@ -437,10 +453,19 @@ export default function PatientDetail() {
                   <Button
                     onClick={handleSendQuickMessage}
                     disabled={sendingMsg || !quickReply.trim()}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white self-end shrink-0 text-xs px-4 h-10"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white self-end shrink-0 text-xs px-4 h-10 flex items-center"
+                    title={
+                      waConfig?.status === 'conectado'
+                        ? 'Envio direto via WhatsApp Cloud API'
+                        : 'Enviar via WhatsApp'
+                    }
                   >
-                    <Send className="h-3.5 w-3.5 mr-1.5" />
-                    Enviar
+                    {waConfig?.status === 'conectado' ? (
+                      <Zap className="h-3.5 w-3.5 mr-1.5 text-amber-300 fill-amber-300" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    {waConfig?.status === 'conectado' ? 'Enviar Direto' : 'Enviar'}
                   </Button>
                 </div>
               </div>

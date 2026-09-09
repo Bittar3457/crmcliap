@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-09T01:05:30.999Z",
+  "generatedAt": "2026-09-09T19:45:29.318Z",
   "collections": [
     {
       "name": "users",
@@ -472,6 +472,101 @@
         }
       ],
       "indexes": ["CREATE UNIQUE INDEX idx_message_templates_type ON message_templates (type)"]
+    },
+    {
+      "name": "whatsapp_settings",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "app_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "phone_number_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "waba_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "access_token",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "display_phone_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "verified_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quality_rating",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "webhook_verify_token",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["desconectado", "conectado", "erro"]
+        },
+        {
+          "name": "last_tested_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_error",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_wa_settings_status ON whatsapp_settings (status)"]
     }
   ]
 }

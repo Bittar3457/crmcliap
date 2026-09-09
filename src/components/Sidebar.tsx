@@ -7,6 +7,7 @@ import {
   BookOpen,
   Inbox,
   Send,
+  Settings2,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -26,6 +27,7 @@ const navItems = [
   { label: 'Orientações', href: '/orientacoes', icon: BookOpen },
   { label: 'Inbox WhatsApp', href: '/inbox-whatsapp', icon: Inbox, badge: 'Novo' },
   { label: 'Centro WhatsApp', href: '/whatsapp', icon: Send },
+  { label: 'Config. WhatsApp', href: '/configuracoes-whatsapp', icon: Settings2 },
 ]
 
 export function Sidebar({ onItemClick }: SidebarProps) {

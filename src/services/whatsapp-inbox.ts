@@ -5,6 +5,7 @@ import { getPatients } from './patients'
 import { getWhatsAppMessages, createWhatsAppMessage } from './whatsapp'
 import { interpolateTemplate, buildTemplateContext } from '@/lib/template-interpolator'
 import { buildWhatsAppLink } from '@/lib/whatsapp-utils'
+import { getWhatsAppConfig, sendWhatsAppMessageApi, type WhatsAppConfig } from './whatsapp-api'
 
 const STORAGE_KEY_CUSTOM_MESSAGES = 'cliap_inbox_custom_messages'
 const STORAGE_KEY_TEMPLATES = 'cliap_inbox_custom_templates'
@@ -309,27 +310,48 @@ export async function sendInboxMessage(params: {
     senderName: senderName || 'Recepção Cliap',
   }
 
-  // 1. Salva localmente
+  // 1. Salva localmente para feedback imediato na UI da Inbox
   saveLocalCustomMessage(newMessage)
 
-  // 2. Se o paciente estiver cadastrado, persiste na collection whatsapp_messages do PocketBase
-  if (patientId) {
-    try {
-      await createWhatsAppMessage({
-        patient: patientId,
-        direction: 'enviada',
+  // 2. Checa se a integração Meta Cloud API está conectada
+  let sentReal = false
+  try {
+    const config = await getWhatsAppConfig().catch(() => null)
+    if (config?.status === 'conectado' && config?.has_token && config?.phone_number_id) {
+      const res = await sendWhatsAppMessageApi({
+        to: phone,
         content,
-        sent_at: new Date().toISOString(),
-        status: 'enviada',
+        patient_id: patientId,
       })
-    } catch (e) {
-      console.warn('Erro ao sincronizar mensagem no PocketBase:', e)
+      if (res.success) {
+        sentReal = true
+      } else {
+        console.warn('Envio via Meta Cloud API falhou, acionando fallback wa.me:', res.error)
+      }
     }
+  } catch (err) {
+    console.warn('Erro ao verificar/enviar via Meta Cloud API:', err)
   }
 
-  // 3. Abre o WhatsApp pelo deep link wa.me
-  const waUrl = buildWhatsAppLink(phone, content)
-  window.open(waUrl, '_blank')
+  // 3. Se não enviou via Cloud API (ou se falhou), persiste no banco e aciona deep link
+  if (!sentReal) {
+    if (patientId) {
+      try {
+        await createWhatsAppMessage({
+          patient: patientId,
+          direction: 'enviada',
+          content,
+          sent_at: new Date().toISOString(),
+          status: 'enviada',
+        })
+      } catch (e) {
+        console.warn('Erro ao sincronizar mensagem no PocketBase:', e)
+      }
+    }
+
+    const waUrl = buildWhatsAppLink(phone, content)
+    window.open(waUrl, '_blank')
+  }
 
   return newMessage
 }

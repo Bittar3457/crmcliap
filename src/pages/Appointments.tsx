@@ -21,17 +21,28 @@ import { AppointmentFormModal } from '@/components/AppointmentFormModal'
 import { buildWhatsAppLink, formatPhoneNumber } from '@/lib/whatsapp-utils'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from '@/components/ui/use-toast'
+import {
+  getWhatsAppConfig,
+  sendWhatsAppMessageApi,
+  type WhatsAppConfig,
+} from '@/services/whatsapp-api'
+import { Zap } from 'lucide-react'
 
 export default function Appointments() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('todos')
+  const [waConfig, setWaConfig] = useState<WhatsAppConfig | null>(null)
 
   const loadAppts = async () => {
     try {
-      const data = await getAppointments()
+      const [data, cfg] = await Promise.all([
+        getAppointments(),
+        getWhatsAppConfig().catch(() => null),
+      ])
       setAppointments(data)
+      if (cfg) setWaConfig(cfg)
     } catch (err) {
       console.error(err)
     }
@@ -72,24 +83,47 @@ export default function Appointments() {
     })
 
     try {
-      // Dispara via serviço de envio (abre deep link wa.me e persiste mensagem no histórico)
-      await sendInboxMessage({
-        conversationId: `conv-${patient.id}`,
-        phone: patient.phone,
-        content: interpolated,
-        patientId: patient.id,
-        senderName: 'Recepção Cliap',
-      })
+      // Se tiver Cloud API conectada, tenta envio direto
+      let sentReal = false
+      if (waConfig?.status === 'conectado' && waConfig.has_token && waConfig.phone_number_id) {
+        try {
+          const apiRes = await sendWhatsAppMessageApi({
+            to: patient.phone,
+            content: interpolated,
+            patient_id: patient.id,
+          })
+          if (apiRes.success) {
+            sentReal = true
+            toast({
+              title: 'Confirmação enviada via WhatsApp Cloud API!',
+              description: `Mensagem entregue com sucesso para ${patient.parent_name || patient.full_name}.`,
+            })
+          }
+        } catch (e) {
+          console.warn('Falha na Cloud API, acionando fallback:', e)
+        }
+      }
+
+      // Se não enviou via Cloud API, aciona sendInboxMessage com deep link
+      if (!sentReal) {
+        await sendInboxMessage({
+          conversationId: `conv-${patient.id}`,
+          phone: patient.phone,
+          content: interpolated,
+          patientId: patient.id,
+          senderName: 'Recepção Cliap',
+        })
+        toast({
+          title: 'Confirmação enviada via WhatsApp (Deep Link)!',
+          description: `Template disparado para ${patient.parent_name || patient.full_name}.`,
+        })
+      }
 
       // Atualiza o agendamento marcando lembrete gerado
       await updateAppointment(appt.id, {
         reminder_generated: true,
       })
 
-      toast({
-        title: 'Confirmação enviada via WhatsApp!',
-        description: `Template de confirmação disparado para ${patient.parent_name || patient.full_name}.`,
-      })
       loadAppts()
     } catch (err) {
       console.error(err)
@@ -232,10 +266,18 @@ export default function Appointments() {
                   <Button
                     size="sm"
                     onClick={() => handleSendWhatsAppConfirmation(a)}
-                    className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-medium"
-                    title="Dispara o template de confirmação manualmente via deep link oficial"
+                    className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-medium flex items-center"
+                    title={
+                      waConfig?.status === 'conectado'
+                        ? 'Disparar confirmação diretamente via WhatsApp Cloud API oficial'
+                        : 'Dispara o template de confirmação manualmente via deep link oficial'
+                    }
                   >
-                    <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                    {waConfig?.status === 'conectado' ? (
+                      <Zap className="h-3.5 w-3.5 mr-1.5 text-amber-300 fill-amber-300" />
+                    ) : (
+                      <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                    )}
                     Enviar confirmação por WhatsApp
                   </Button>
 

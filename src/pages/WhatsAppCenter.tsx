@@ -31,6 +31,13 @@ import { getCareInstructions } from '@/services/care-instructions'
 import { getAppointments } from '@/services/appointments'
 import { getWhatsAppMessages, createWhatsAppMessage, generateAiDraft } from '@/services/whatsapp'
 import { getMessageTemplates } from '@/services/message-templates'
+import {
+  getWhatsAppConfig,
+  sendWhatsAppMessageApi,
+  type WhatsAppConfig,
+} from '@/services/whatsapp-api'
+import { Link } from 'react-router-dom'
+import { Zap, AlertTriangle, ExternalLink } from 'lucide-react'
 import type {
   Patient,
   CareInstruction,
@@ -74,21 +81,24 @@ export default function WhatsAppCenter() {
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false)
+  const [waConfig, setWaConfig] = useState<WhatsAppConfig | null>(null)
 
   const loadInitialData = async () => {
     try {
-      const [pList, iList, aList, mList, tList] = await Promise.all([
+      const [pList, iList, aList, mList, tList, cfg] = await Promise.all([
         getPatients(),
         getCareInstructions(),
         getAppointments(),
         getWhatsAppMessages(),
         getMessageTemplates(),
+        getWhatsAppConfig().catch(() => null),
       ])
       setPatients(pList)
       setInstructions(iList)
       setAppointments(aList)
       setMessages(mList)
       setTemplates(tList)
+      if (cfg) setWaConfig(cfg)
 
       if (!selectedPatientId && pList.length > 0) {
         setSelectedPatientId(pList[0].id)
@@ -250,27 +260,69 @@ export default function WhatsAppCenter() {
 
     setSaving(true)
     try {
-      await createWhatsAppMessage({
-        patient: selectedPatientId,
-        direction: 'enviada',
-        template: selectedInstructionId || undefined,
-        content: messageContent,
-        sent_at: new Date().toISOString(),
-        status: 'enviada',
-      })
+      // Se a integração Meta Cloud API estiver ativa e conectada, tenta o envio real server-side
+      const isConnected =
+        waConfig?.status === 'conectado' && waConfig?.has_token && waConfig?.phone_number_id
+      let sentReal = false
 
-      window.open(buildWhatsAppLink(patient.phone, messageContent), '_blank')
-      toast({
-        title: 'Abrindo WhatsApp...',
-        description: 'A mensagem foi registrada no histórico.',
-      })
+      if (isConnected) {
+        try {
+          const apiRes = await sendWhatsAppMessageApi({
+            to: patient.phone,
+            content: messageContent,
+            patient_id: selectedPatientId,
+            template_id: selectedInstructionId || undefined,
+          })
+
+          if (apiRes.success) {
+            sentReal = true
+            toast({
+              title: 'Mensagem enviada com sucesso pela Meta Cloud API!',
+              description: `Entregue via WhatsApp oficial da Cliap para ${patient.parent_name || patient.full_name}.`,
+            })
+          } else {
+            console.warn('Falha no envio via Meta API, acionando fallback deep link:', apiRes.error)
+            toast({
+              title: 'Aviso: Envio pela Cloud API indisponível',
+              description: `${apiRes.error || 'Conta em análise ou limite atingido'}. Abrindo fallback via WhatsApp Web...`,
+              variant: 'default',
+            })
+          }
+        } catch (apiErr: unknown) {
+          console.warn('Erro ao chamar API Meta, usando fallback:', apiErr)
+          toast({
+            title: 'Erro temporário na Cloud API',
+            description: 'Redirecionando para envio manual via WhatsApp oficial (fallback)...',
+          })
+        }
+      }
+
+      // Se não enviou via Cloud API (ou se falhou/desconectado), usa o deep link com persistência
+      if (!sentReal) {
+        await createWhatsAppMessage({
+          patient: selectedPatientId,
+          direction: 'enviada',
+          template: selectedInstructionId || undefined,
+          content: messageContent,
+          sent_at: new Date().toISOString(),
+          status: 'enviada',
+        })
+
+        window.open(buildWhatsAppLink(patient.phone, messageContent), '_blank')
+        if (!isConnected) {
+          toast({
+            title: 'Abrindo WhatsApp (Deep Link)',
+            description: 'A mensagem foi registrada no prontuário do paciente.',
+          })
+        }
+      }
 
       setMessageContent('')
       setNotes('')
       setSelectedInstructionId('')
       loadInitialData()
     } catch {
-      toast({ title: 'Erro ao registrar mensagem', variant: 'destructive' })
+      toast({ title: 'Erro ao processar envio', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -310,14 +362,47 @@ export default function WhatsAppCenter() {
           </p>
         </div>
 
-        <Button
-          onClick={() => setIsEditorModalOpen(true)}
-          variant="outline"
-          className="border-[#1F3A4D]/30 text-[#1F3A4D] hover:bg-[#1F3A4D]/10 font-medium self-start sm:self-auto flex items-center gap-2"
-        >
-          <Settings2 className="h-4 w-4 text-[#1F3A4D]" />
-          Editar Modelos de Mensagem
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          {/* Indicador de Status da Integração */}
+          <Link to="/configuracoes-whatsapp">
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-9 text-xs font-semibold flex items-center gap-1.5 ${
+                waConfig?.status === 'conectado'
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100/70'
+                  : waConfig?.status === 'erro'
+                    ? 'border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100/70'
+                    : 'border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100'
+              }`}
+              title="Clique para gerenciar a integração Meta Cloud API"
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  waConfig?.status === 'conectado'
+                    ? 'bg-emerald-500 animate-pulse'
+                    : waConfig?.status === 'erro'
+                      ? 'bg-rose-500'
+                      : 'bg-slate-400'
+                }`}
+              />
+              {waConfig?.status === 'conectado'
+                ? 'Cloud API Conectada'
+                : waConfig?.status === 'erro'
+                  ? 'Cloud API: Erro'
+                  : 'Integração: Desconectada'}
+            </Button>
+          </Link>
+
+          <Button
+            onClick={() => setIsEditorModalOpen(true)}
+            variant="outline"
+            className="border-[#1F3A4D]/30 text-[#1F3A4D] hover:bg-[#1F3A4D]/10 font-medium flex items-center gap-2 text-xs h-9"
+          >
+            <Settings2 className="h-4 w-4 text-[#1F3A4D]" />
+            Editar Modelos
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -521,9 +606,21 @@ export default function WhatsAppCenter() {
                 <Button
                   onClick={handleSendViaWhatsApp}
                   disabled={saving || !messageContent.trim()}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium flex items-center"
+                  title={
+                    waConfig?.status === 'conectado'
+                      ? 'Envio direto server-side via WhatsApp Cloud API oficial'
+                      : 'Envio pelo WhatsApp oficial (deep link wa.me)'
+                  }
                 >
-                  <Send className="h-4 w-4 mr-2" /> Enviar via WhatsApp
+                  {waConfig?.status === 'conectado' ? (
+                    <Zap className="h-4 w-4 mr-2 text-amber-300 fill-amber-300" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  {waConfig?.status === 'conectado'
+                    ? 'Enviar via Cloud API'
+                    : 'Enviar via WhatsApp'}
                 </Button>
               </div>
             </CardContent>

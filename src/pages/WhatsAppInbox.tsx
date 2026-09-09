@@ -59,6 +59,8 @@ import type { Patient, Appointment } from '@/types/crm'
 import type { WhatsAppChatMessage, InboxMessageTemplate } from '@/types/whatsapp-inbox'
 import { formatPhoneNumber } from '@/lib/whatsapp-utils'
 import { useRealtime } from '@/hooks/use-realtime'
+import { getWhatsAppConfig, type WhatsAppConfig } from '@/services/whatsapp-api'
+import { Zap, Settings2 } from 'lucide-react'
 
 export default function WhatsAppInbox() {
   const location = useLocation()
@@ -80,6 +82,7 @@ export default function WhatsAppInbox() {
   const [newChatDialogOpen, setNewChatDialogOpen] = useState(false)
   const [newChatPhone, setNewChatPhone] = useState('')
   const [newChatPatientId, setNewChatPatientId] = useState('')
+  const [waConfig, setWaConfig] = useState<WhatsAppConfig | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -87,14 +90,16 @@ export default function WhatsAppInbox() {
   const loadData = async (preselectPhone?: string) => {
     try {
       setLoading(true)
-      const [pts, appts, tpls] = await Promise.all([
+      const [pts, appts, tpls, cfg] = await Promise.all([
         getPatients(),
         getAppointments(),
         Promise.resolve(getInboxTemplates()),
+        getWhatsAppConfig().catch(() => null),
       ])
       setPatients(pts)
       setAppointments(appts)
       setTemplates(tpls)
+      if (cfg) setWaConfig(cfg)
 
       const convList = await getInboxConversations(pts)
       setConversations(convList)
@@ -212,10 +217,17 @@ export default function WhatsAppInbox() {
       setActiveMessages((prev) => [...prev, sent])
       setReplyText('')
 
-      toast({
-        title: 'WhatsApp aberto com sucesso!',
-        description: 'Mensagem enviada via deep link e gravada no histórico.',
-      })
+      if (waConfig?.status === 'conectado') {
+        toast({
+          title: 'Mensagem enviada com sucesso!',
+          description: 'Processada via WhatsApp Cloud API oficial.',
+        })
+      } else {
+        toast({
+          title: 'WhatsApp aberto com sucesso!',
+          description: 'Mensagem enviada via deep link e gravada no histórico.',
+        })
+      }
 
       // Recarrega conversas para atualizar a última mensagem
       const updated = await getInboxConversations(patients)
@@ -284,27 +296,55 @@ export default function WhatsAppInbox() {
                 <h2 className="text-base font-bold text-[#1F3A4D]">
                   Inbox WhatsApp • Cliap Pediatria e Imunização
                 </h2>
-                <Badge
-                  variant="outline"
-                  className="bg-emerald-100/80 text-emerald-800 border-emerald-300 text-[11px] font-semibold"
-                >
-                  Deep Link Oficial wa.me
-                </Badge>
+                {waConfig?.status === 'conectado' ? (
+                  <Badge
+                    variant="outline"
+                    className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[11px] font-semibold flex items-center gap-1"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Meta Cloud API Conectada
+                  </Badge>
+                ) : waConfig?.status === 'erro' ? (
+                  <Badge
+                    variant="outline"
+                    className="bg-rose-100 text-rose-800 border-rose-300 text-[11px] font-semibold"
+                  >
+                    Cloud API: Erro / Fallback Ativo
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="bg-slate-100 text-slate-700 border-slate-300 text-[11px] font-semibold"
+                  >
+                    Integração Desconectada (Deep Link Ativo)
+                  </Badge>
+                )}
                 <Badge
                   variant="outline"
                   className="bg-amber-100/80 text-amber-900 border-amber-300 text-[11px] font-semibold"
                 >
-                  Dados de Exemplo Mockados
+                  Mensagens Inbound + Exemplos
                 </Badge>
               </div>
               <p className="text-xs text-slate-600 mt-1">
                 Visualização unificada de conversas da recepção, vinculação automática com a ficha
-                do paciente por telefone e disparador de templates com deep link oficial.
+                do paciente por telefone e envio via Cloud API oficial ou deep link de contingência.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+            <Link to="/configuracoes-whatsapp">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs border-slate-300 hover:bg-white text-slate-700 h-8"
+                title="Configurações da Meta Cloud API"
+              >
+                <Settings2 className="h-3.5 w-3.5 mr-1 text-teal-800" />
+                Configurar API
+              </Button>
+            </Link>
             <Button
               variant="outline"
               size="sm"
@@ -322,7 +362,7 @@ export default function WhatsAppInbox() {
                 className="text-xs border-teal-300 text-teal-800 hover:bg-teal-100/50 h-8 font-medium"
               >
                 <Sparkles className="h-3.5 w-3.5 mr-1 text-amber-500" />
-                Centro Avançado (IA)
+                Centro Avançado
               </Button>
             </Link>
           </div>
@@ -820,11 +860,19 @@ export default function WhatsAppInbox() {
                     type="button"
                     disabled={sending || !replyText.trim()}
                     onClick={handleSendMessage}
-                    className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 font-medium"
-                    title="Enviar via deep link do WhatsApp oficial"
+                    className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 font-medium flex items-center"
+                    title={
+                      waConfig?.status === 'conectado'
+                        ? 'Enviar instantaneamente via Meta Cloud API'
+                        : 'Enviar via deep link do WhatsApp oficial'
+                    }
                   >
-                    <Send className="h-4 w-4 mr-1.5" />
-                    Enviar
+                    {waConfig?.status === 'conectado' ? (
+                      <Zap className="h-4 w-4 mr-1.5 text-amber-300 fill-amber-300" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-1.5" />
+                    )}
+                    {waConfig?.status === 'conectado' ? 'Enviar Direto' : 'Enviar'}
                   </Button>
                 </div>
 

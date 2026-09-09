@@ -17,6 +17,7 @@ import Vaccinations from '@/pages/Vaccinations'
 import CareInstructions from '@/pages/CareInstructions'
 import WhatsAppCenter from '@/pages/WhatsAppCenter'
 import WhatsAppInbox from '@/pages/WhatsAppInbox'
+import WhatsAppSettings from '@/pages/WhatsAppSettings'
 import NotFound from '@/pages/NotFound'
 
 const App = () => (
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="/orientacoes" element={<CareInstructions />} />
               <Route path="/inbox-whatsapp" element={<WhatsAppInbox />} />
               <Route path="/whatsapp" element={<WhatsAppCenter />} />
+              <Route path="/configuracoes-whatsapp" element={<WhatsAppSettings />} />
             </Route>
           </Route>
 
