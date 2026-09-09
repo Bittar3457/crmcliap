@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   ArrowLeft,
   KeyRound,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +28,7 @@ import { CliapLogo } from '@/components/CliapLogo'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -100,6 +103,23 @@ export default function Login() {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-1.5">
+              <Label htmlFor="email">E-mail Profissional</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="robertobittar98@gmail.com"
+                  className="pl-9"
+                  required
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Senha de Acesso</Label>
                 <button
@@ -119,28 +139,22 @@ export default function Login() {
                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="pl-9"
+                  className="pl-9 pr-10"
                   required
                 />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Senha de Acesso</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="pl-9"
-                  required
-                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Exibir senha'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 

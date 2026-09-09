@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Lock, Mail, User, Loader2 } from 'lucide-react'
+import { Lock, Mail, User, Loader2, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +13,7 @@ export default function Signup() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const { signUp } = useAuth()
@@ -117,13 +118,23 @@ export default function Signup() {
                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="pl-9"
+                  className="pl-9 pr-10"
                   required
+                  minLength={8}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Exibir senha'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
@@ -133,12 +144,13 @@ export default function Signup() {
                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
                   id="passwordConfirm"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={passwordConfirm}
                   onChange={(e) => setPasswordConfirm(e.target.value)}
                   placeholder="••••••••"
-                  className="pl-9"
+                  className="pl-9 pr-10"
                   required
+                  minLength={8}
                 />
               </div>
             </div>
