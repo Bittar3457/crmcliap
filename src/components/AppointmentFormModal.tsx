@@ -57,9 +57,17 @@ export function AppointmentFormModal({
       setPatientId(appointment.patient)
       setType(appointment.type || 'consulta')
       setStatus(appointment.status || 'agendado')
-      setDateTime(
-        appointment.date_time ? new Date(appointment.date_time).toISOString().slice(0, 16) : '',
-      )
+      if (appointment.date_time) {
+        const d = new Date(appointment.date_time)
+        const yr = d.getFullYear()
+        const mo = String(d.getMonth() + 1).padStart(2, '0')
+        const da = String(d.getDate()).padStart(2, '0')
+        const ho = String(d.getHours()).padStart(2, '0')
+        const mi = String(d.getMinutes()).padStart(2, '0')
+        setDateTime(`${yr}-${mo}-${da}T${ho}:${mi}`)
+      } else {
+        setDateTime('')
+      }
       setNotes(appointment.notes || '')
     } else {
       setPatientId(defaultPatientId || '')
@@ -67,8 +75,10 @@ export function AppointmentFormModal({
       setStatus('agendado')
       const tomorrow = new Date()
       tomorrow.setDate(tomorrow.getDate() + 1)
-      tomorrow.setHours(10, 0, 0, 0)
-      setDateTime(tomorrow.toISOString().slice(0, 16))
+      const yr = tomorrow.getFullYear()
+      const mo = String(tomorrow.getMonth() + 1).padStart(2, '0')
+      const da = String(tomorrow.getDate()).padStart(2, '0')
+      setDateTime(`${yr}-${mo}-${da}T10:00`)
       setNotes('')
     }
   }, [appointment, defaultPatientId, open])

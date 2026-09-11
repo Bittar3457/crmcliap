@@ -9,9 +9,12 @@ import {
   Send,
   Plus,
   ArrowRight,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/hooks/use-auth'
 import { getAppointments, updateAppointment } from '@/services/appointments'
 import { getVaccinations } from '@/services/vaccinations'
@@ -20,6 +23,7 @@ import { getWhatsAppMessages } from '@/services/whatsapp'
 import type { Appointment, Vaccination, WhatsAppMessage } from '@/types/crm'
 import { useRealtime } from '@/hooks/use-realtime'
 import { buildWhatsAppLink, formatPhoneNumber, openWhatsAppExternal } from '@/lib/whatsapp-utils'
+import { isTodayLocal, isPastDayLocal } from '@/lib/date-utils'
 import { toast } from '@/components/ui/use-toast'
 
 export default function Dashboard() {
@@ -27,6 +31,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
 
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([])
+  const [delayedAppointments, setDelayedAppointments] = useState<Appointment[]>([])
   const [upcomingVaccines, setUpcomingVaccines] = useState<Vaccination[]>([])
   const [patientCount, setPatientCount] = useState(0)
   const [pendingMessages, setPendingMessages] = useState<WhatsAppMessage[]>([])
@@ -43,9 +48,22 @@ export default function Dashboard() {
 
       setPatientCount(patients.filter((p) => p.active !== false).length)
 
-      const todayStr = new Date().toISOString().split('T')[0]
-      const todayAppts = appts.filter((a) => a.date_time && a.date_time.startsWith(todayStr))
-      setTodayAppointments(todayAppts.length > 0 ? todayAppts : appts.slice(0, 5))
+      // 1. Filtrar estritamente agendamentos do dia de hoje no fuso local
+      const todayAppts = appts
+        .filter((a) => Boolean(a.date_time && isTodayLocal(a.date_time)))
+        .sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime())
+      setTodayAppointments(todayAppts)
+
+      // 2. Filtrar consultas atrasadas (data anterior a hoje e status pendente/confirmado)
+      const delayed = appts
+        .filter((a) => {
+          if (!a.date_time) return false
+          const isPast = isPastDayLocal(a.date_time)
+          const isPending = a.status === 'agendado' || a.status === 'confirmado'
+          return isPast && isPending
+        })
+        .sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime())
+      setDelayedAppointments(delayed)
 
       const pendingVacs = vacs.filter((v) => v.status === 'agendada' || v.status === 'atrasada')
       setUpcomingVaccines(pendingVacs.slice(0, 5))
@@ -88,6 +106,22 @@ export default function Dashboard() {
       loadData()
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  const handleMarkAsDone = async (apptId: string) => {
+    try {
+      await updateAppointment(apptId, { status: 'concluido' })
+      toast({
+        title: 'Consulta marcada como concluída!',
+      })
+      loadData()
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Erro ao atualizar consulta',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -186,10 +220,17 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border-slate-200 shadow-subtle">
           <CardHeader className="flex flex-row items-center justify-between pb-2 border-b">
-            <CardTitle className="text-base font-bold text-slate-800 flex items-center">
-              <Calendar className="h-4 w-4 mr-2 text-teal-800" />
-              Próximos Agendamentos
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-bold text-slate-800 flex items-center">
+                <Calendar className="h-4 w-4 mr-2 text-teal-800" />
+                Pacientes Agendados Hoje
+              </CardTitle>
+              {todayAppointments.length > 0 && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200">
+                  {todayAppointments.length}
+                </span>
+              )}
+            </div>
             <Button
               variant="ghost"
               size="sm"
@@ -201,9 +242,12 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="p-4 space-y-3">
             {todayAppointments.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-6">
-                Nenhum agendamento para hoje.
-              </p>
+              <div className="text-center py-6">
+                <p className="text-sm font-medium text-slate-600">Nenhum agendamento para hoje.</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Os agendamentos do dia aparecerão aqui automaticamente.
+                </p>
+              </div>
             ) : (
               todayAppointments.map((appt) => (
                 <div
@@ -211,26 +255,43 @@ export default function Dashboard() {
                   className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-slate-100/50 transition-colors"
                 >
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {appt.expand?.patient?.full_name || 'Paciente'}
-                    </p>
-                    <p className="text-xs text-slate-500">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {appt.expand?.patient?.full_name || 'Paciente'}
+                      </p>
+                      <span
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize ${
+                          appt.status === 'confirmado'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}
+                      >
+                        {appt.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      <Clock className="h-3 w-3 inline mr-1 text-slate-400" />
                       {new Date(appt.date_time).toLocaleTimeString('pt-BR', {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}{' '}
                       • <span className="capitalize">{appt.type}</span>
+                      {appt.expand?.patient?.parent_name && (
+                        <span> • Resp: {appt.expand.patient.parent_name}</span>
+                      )}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleSendReminder(appt)}
-                    className="text-xs text-teal-800 border-teal-200 hover:bg-teal-50"
-                  >
-                    <Send className="h-3 w-3 mr-1" />
-                    Lembrete WA
-                  </Button>
+                  <div className="flex items-center space-x-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSendReminder(appt)}
+                      className="text-xs text-teal-800 border-teal-200 hover:bg-teal-50 h-8"
+                    >
+                      <Send className="h-3 w-3 mr-1" />
+                      Lembrete WA
+                    </Button>
+                  </div>
                 </div>
               ))
             )}
@@ -286,6 +347,147 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Seção separada: Consultas Atrasadas */}
+      <Card className="border-slate-200 shadow-subtle border-l-4 border-l-[#B06A5E]">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b gap-2">
+          <div className="flex items-center space-x-2">
+            <div className="h-8 w-8 rounded-lg bg-[#B06A5E]/10 text-[#B06A5E] flex items-center justify-center shrink-0">
+              <AlertTriangle className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base font-bold text-slate-900">
+                  Consultas Atrasadas
+                </CardTitle>
+                <Badge
+                  variant="outline"
+                  className={
+                    delayedAppointments.length > 0
+                      ? 'bg-[#B06A5E]/10 text-[#B06A5E] border-[#B06A5E]/30 font-semibold'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-normal'
+                  }
+                >
+                  {delayedAppointments.length > 0
+                    ? `${delayedAppointments.length} pendente${delayedAppointments.length > 1 ? 's' : ''}`
+                    : 'Em dia'}
+                </Badge>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Agendamentos com data anterior a hoje que ainda não foram marcados como concluídos
+                ou cancelados
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/agendamentos')}
+            className="text-xs text-teal-800 hover:text-teal-900 self-start sm:self-auto"
+          >
+            Gerenciar agendamentos <ArrowRight className="h-3 w-3 ml-1" />
+          </Button>
+        </CardHeader>
+        <CardContent className="p-4">
+          {delayedAppointments.length === 0 ? (
+            <div className="py-6 text-center text-slate-500 flex flex-col items-center justify-center">
+              <div className="h-10 w-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <p className="text-sm font-medium text-slate-700">Tudo em dia!</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Não há consultas de datas passadas pendentes de atendimento.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {delayedAppointments.map((appt) => {
+                const apptDate = new Date(appt.date_time)
+                const realDateFormatted = apptDate.toLocaleDateString('pt-BR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                })
+                const realTimeFormatted = apptDate.toLocaleTimeString('pt-BR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+
+                return (
+                  <div
+                    key={appt.id}
+                    className="py-3 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 p-2 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-lg bg-[#B06A5E]/10 border border-[#B06A5E]/20 text-[#B06A5E] shrink-0 min-w-[72px]">
+                        <span className="text-[10px] uppercase font-bold tracking-wider">
+                          {apptDate.toLocaleDateString('pt-BR', { month: 'short' })}
+                        </span>
+                        <span className="text-lg font-extrabold leading-none my-0.5">
+                          {apptDate.getDate()}
+                        </span>
+                        <span className="text-[10px] font-medium text-slate-500">
+                          {apptDate.getFullYear()}
+                        </span>
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-slate-900 truncate">
+                            {appt.expand?.patient?.full_name || 'Paciente'}
+                          </p>
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#B06A5E]/15 text-[#8f4f44] border border-[#B06A5E]/30 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Data real: {realDateFormatted} às {realTimeFormatted}
+                          </span>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 capitalize">
+                            {appt.status}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-500 mt-1">
+                          Tipo: <strong className="capitalize text-slate-700">{appt.type}</strong>
+                          {appt.expand?.patient?.parent_name && (
+                            <span> • Responsável: {appt.expand.patient.parent_name}</span>
+                          )}
+                          {appt.notes && (
+                            <span className="block text-slate-600 italic mt-0.5">
+                              "{appt.notes}"
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSendReminder(appt)}
+                        className="text-xs text-teal-800 border-teal-200 hover:bg-teal-50 h-8"
+                        title="Enviar mensagem para reagendamento ou confirmação via WhatsApp"
+                      >
+                        <Send className="h-3 w-3 mr-1" />
+                        Contatar WA
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleMarkAsDone(appt.id)}
+                        className="text-xs text-emerald-700 hover:bg-emerald-50 h-8"
+                        title="Marcar consulta atrasada como concluída"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                        Concluir
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
