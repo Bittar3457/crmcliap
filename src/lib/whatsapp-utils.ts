@@ -10,13 +10,53 @@ export function formatPhoneNumber(phone: string): string {
   return phone
 }
 
-export function buildWhatsAppLink(phone: string, text: string): string {
+export function buildWhatsAppLink(phone: string, text?: string): string {
   let cleanPhone = phone.replace(/\D/g, '')
-  if (!cleanPhone.startsWith('55') && cleanPhone.length <= 11) {
+  if (!cleanPhone.startsWith('55') && cleanPhone.length <= 11 && cleanPhone.length > 0) {
     cleanPhone = '55' + cleanPhone
+  }
+  if (!text) {
+    return `https://wa.me/${cleanPhone}`
   }
   const encodedText = encodeURIComponent(text)
   return `https://wa.me/${cleanPhone}?text=${encodedText}`
+}
+
+/**
+ * Abre o deep link do WhatsApp sempre em nova aba do navegador com noopener e noreferrer.
+ * Evita o erro ERR_BLOCKED_BY_RESPONSE quando a aplicação roda dentro de iframes (como a pré-visualização).
+ */
+export function openWhatsAppExternal(urlOrPhone: string, text?: string): Window | null {
+  const finalUrl =
+    urlOrPhone.startsWith('http://') || urlOrPhone.startsWith('https://')
+      ? urlOrPhone
+      : buildWhatsAppLink(urlOrPhone, text)
+
+  // 1. Tenta abrir diretamente com target _blank e features de segurança
+  try {
+    const newWindow = window.open(finalUrl, '_blank', 'noopener,noreferrer')
+    if (newWindow) {
+      newWindow.opener = null
+      return newWindow
+    }
+  } catch (err) {
+    console.warn('Falha na tentativa direta de window.open:', err)
+  }
+
+  // 2. Fallback via elemento âncora programático para navegadores com restrição em iframe
+  try {
+    const a = document.createElement('a')
+    a.href = finalUrl
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    return null
+  } catch (err) {
+    console.warn('Falha no fallback de clique de âncora:', err)
+    return null
+  }
 }
 
 export function calculateAge(birthDateStr?: string): string {

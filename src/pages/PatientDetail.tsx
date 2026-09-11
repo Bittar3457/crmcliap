@@ -32,7 +32,12 @@ import {
 } from '@/services/whatsapp-inbox'
 import type { Patient, Appointment, Vaccination } from '@/types/crm'
 import type { WhatsAppChatMessage } from '@/types/whatsapp-inbox'
-import { formatPhoneNumber, calculateAge, buildWhatsAppLink } from '@/lib/whatsapp-utils'
+import {
+  formatPhoneNumber,
+  calculateAge,
+  buildWhatsAppLink,
+  openWhatsAppExternal,
+} from '@/lib/whatsapp-utils'
 import { AppointmentFormModal } from '@/components/AppointmentFormModal'
 import { VaccinationFormModal } from '@/components/VaccinationFormModal'
 import { toast } from '@/components/ui/use-toast'
@@ -98,7 +103,7 @@ export default function PatientDetail() {
 
   const handleOpenWhatsApp = () => {
     const text = `Olá, ${patient.parent_name || 'Responsável'}! Como está o(a) ${patient.full_name}? Entramos em contato da Cliap • Pediatria e Imunização.`
-    window.open(buildWhatsAppLink(patient.phone, text), '_blank')
+    openWhatsAppExternal(buildWhatsAppLink(patient.phone, text))
   }
 
   const handleComposeWithPatient = () => {

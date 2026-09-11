@@ -19,7 +19,7 @@ import { getPatients } from '@/services/patients'
 import { getWhatsAppMessages } from '@/services/whatsapp'
 import type { Appointment, Vaccination, WhatsAppMessage } from '@/types/crm'
 import { useRealtime } from '@/hooks/use-realtime'
-import { buildWhatsAppLink, formatPhoneNumber } from '@/lib/whatsapp-utils'
+import { buildWhatsAppLink, formatPhoneNumber, openWhatsAppExternal } from '@/lib/whatsapp-utils'
 import { toast } from '@/components/ui/use-toast'
 
 export default function Dashboard() {
@@ -77,7 +77,7 @@ export default function Dashboard() {
 
     const messageText = `Olá, ${patient.parent_name || 'Responsável'}! Aqui é da equipe Cliap (Pediatria e Imunização). Lembrete de agendamento para ${patient.full_name}:\n- Data/Hora: ${dateFormatted}\n- Tipo: ${appt.type}\nPor favor, confirme respondendo esta mensagem!\n\nAtenciosamente,\nEquipe Cliap`
 
-    window.open(buildWhatsAppLink(patient.phone, messageText), '_blank')
+    openWhatsAppExternal(buildWhatsAppLink(patient.phone, messageText))
 
     try {
       await updateAppointment(appt.id, { reminder_generated: true, status: 'confirmado' })

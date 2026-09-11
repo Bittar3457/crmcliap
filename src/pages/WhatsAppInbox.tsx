@@ -57,7 +57,7 @@ import {
 } from '@/services/whatsapp-inbox'
 import type { Patient, Appointment } from '@/types/crm'
 import type { WhatsAppChatMessage, InboxMessageTemplate } from '@/types/whatsapp-inbox'
-import { formatPhoneNumber } from '@/lib/whatsapp-utils'
+import { formatPhoneNumber, openWhatsAppExternal, buildWhatsAppLink } from '@/lib/whatsapp-utils'
 import { useRealtime } from '@/hooks/use-realtime'
 import { getWhatsAppConfig, type WhatsAppConfig } from '@/services/whatsapp-api'
 import { Zap, Settings2 } from 'lucide-react'
@@ -414,9 +414,9 @@ export default function WhatsAppInbox() {
                         if (found) {
                           setActiveConversationId(found.id)
                         } else {
-                          // Abre link e seleciona
-                          const link = `https://wa.me/${p.phone.replace(/\D/g, '')}`
-                          window.open(link, '_blank')
+                          // Abre link e seleciona em nova aba
+                          const link = buildWhatsAppLink(p.phone)
+                          openWhatsAppExternal(link)
                           toast({ title: `WhatsApp aberto para ${p.parent_name || p.full_name}` })
                         }
                       }}
@@ -643,9 +643,9 @@ export default function WhatsAppInbox() {
                   )}
 
                   <a
-                    href={`https://wa.me/${activeConversation.phone.replace(/\D/g, '')}`}
+                    href={buildWhatsAppLink(activeConversation.phone)}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                   >
                     <Button
                       variant="outline"

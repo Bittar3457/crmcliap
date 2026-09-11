@@ -4,7 +4,7 @@ import type { Patient, WhatsAppMessage, Appointment } from '@/types/crm'
 import { getPatients } from './patients'
 import { getWhatsAppMessages, createWhatsAppMessage } from './whatsapp'
 import { interpolateTemplate, buildTemplateContext } from '@/lib/template-interpolator'
-import { buildWhatsAppLink } from '@/lib/whatsapp-utils'
+import { buildWhatsAppLink, openWhatsAppExternal } from '@/lib/whatsapp-utils'
 import { getWhatsAppConfig, sendWhatsAppMessageApi, type WhatsAppConfig } from './whatsapp-api'
 
 const STORAGE_KEY_CUSTOM_MESSAGES = 'cliap_inbox_custom_messages'
@@ -350,7 +350,7 @@ export async function sendInboxMessage(params: {
     }
 
     const waUrl = buildWhatsAppLink(phone, content)
-    window.open(waUrl, '_blank')
+    openWhatsAppExternal(waUrl)
   }
 
   return newMessage

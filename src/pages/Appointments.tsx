@@ -18,7 +18,7 @@ import { sendInboxMessage, formatInboxTemplate } from '@/services/whatsapp-inbox
 import { INBOX_TEMPLATES } from '@/services/mock-inbox-data'
 import type { Appointment, AppointmentStatus, Patient } from '@/types/crm'
 import { AppointmentFormModal } from '@/components/AppointmentFormModal'
-import { buildWhatsAppLink, formatPhoneNumber } from '@/lib/whatsapp-utils'
+import { buildWhatsAppLink, formatPhoneNumber, openWhatsAppExternal } from '@/lib/whatsapp-utils'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from '@/components/ui/use-toast'
 import {
@@ -141,7 +141,7 @@ export default function Appointments() {
       appointment: appt,
     })
 
-    window.open(buildWhatsAppLink(p.phone, msg), '_blank')
+    openWhatsAppExternal(buildWhatsAppLink(p.phone, msg))
 
     await updateAppointment(appt.id, { reminder_generated: true, status: 'confirmado' })
     await createWhatsAppMessage({

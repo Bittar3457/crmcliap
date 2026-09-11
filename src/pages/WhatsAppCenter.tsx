@@ -46,7 +46,7 @@ import type {
   MessageTemplate,
   MessageTemplateType,
 } from '@/types/crm'
-import { buildWhatsAppLink, formatPhoneNumber } from '@/lib/whatsapp-utils'
+import { buildWhatsAppLink, formatPhoneNumber, openWhatsAppExternal } from '@/lib/whatsapp-utils'
 import {
   interpolateTemplate,
   buildTemplateContext,
@@ -308,7 +308,7 @@ export default function WhatsAppCenter() {
           status: 'enviada',
         })
 
-        window.open(buildWhatsAppLink(patient.phone, messageContent), '_blank')
+        openWhatsAppExternal(buildWhatsAppLink(patient.phone, messageContent))
         if (!isConnected) {
           toast({
             title: 'Abrindo WhatsApp (Deep Link)',
