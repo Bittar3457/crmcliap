@@ -20,12 +20,12 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { label: 'Painel', href: '/painel', icon: LayoutDashboard },
+  { label: 'Painel Geral', href: '/painel', icon: LayoutDashboard },
   { label: 'Pacientes', href: '/pacientes', icon: Users },
   { label: 'Agendamentos', href: '/agendamentos', icon: Calendar },
   { label: 'Vacinações', href: '/vacinacoes', icon: Syringe },
   { label: 'Orientações', href: '/orientacoes', icon: BookOpen },
-  { label: 'Inbox WhatsApp', href: '/inbox-whatsapp', icon: Inbox, badge: 'Novo' },
+  { label: 'Inbox WhatsApp', href: '/inbox-whatsapp', icon: Inbox, badge: 'WhatsApp' },
   { label: 'Centro WhatsApp', href: '/whatsapp', icon: Send },
   { label: 'Config. WhatsApp', href: '/configuracoes-whatsapp', icon: Settings2 },
 ]
@@ -37,12 +37,12 @@ export function Sidebar({ onItemClick }: SidebarProps) {
   return (
     <aside className="flex h-full w-64 flex-col bg-white border-r border-slate-200">
       <div className="flex h-20 items-center px-5 border-b border-slate-100">
-        <Link to="/painel" className="w-full" onClick={onItemClick}>
+        <Link to="/painel" className="w-full" onClick={onItemClick} title="Voltar ao Painel Geral">
           <CliapLogo iconSize="h-10 w-10" />
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon
           const isActive = location.pathname.startsWith(item.href)

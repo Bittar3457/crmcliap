@@ -86,22 +86,32 @@ export default function WhatsAppInbox() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  const [loadError, setLoadError] = useState<string | null>(null)
+
   // Carrega lista inicial de conversas e dados do CRM
   const loadData = async (preselectPhone?: string) => {
     try {
       setLoading(true)
-      const [pts, appts, tpls, cfg] = await Promise.all([
+      setLoadError(null)
+
+      const [ptsRes, apptsRes, tplsRes, cfgRes] = await Promise.allSettled([
         getPatients(),
         getAppointments(),
         Promise.resolve(getInboxTemplates()),
-        getWhatsAppConfig().catch(() => null),
+        getWhatsAppConfig(),
       ])
+
+      const pts = ptsRes.status === 'fulfilled' ? ptsRes.value || [] : []
+      const appts = apptsRes.status === 'fulfilled' ? apptsRes.value || [] : []
+      const tpls = tplsRes.status === 'fulfilled' ? tplsRes.value || [] : getInboxTemplates()
+      const cfg = cfgRes.status === 'fulfilled' ? cfgRes.value : null
+
       setPatients(pts)
       setAppointments(appts)
       setTemplates(tpls)
       if (cfg) setWaConfig(cfg)
 
-      const convList = await getInboxConversations(pts)
+      const convList = await getInboxConversations(pts).catch(() => [])
       setConversations(convList)
 
       // Seleção da conversa
@@ -120,8 +130,9 @@ export default function WhatsAppInbox() {
       } else if (!activeConversationId && convList.length > 0) {
         setActiveConversationId(convList[0].id)
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao carregar Inbox:', err)
+      setLoadError('Não foi possível carregar as conversas no momento.')
       toast({ title: 'Erro ao carregar conversas', variant: 'destructive' })
     } finally {
       setLoading(false)
@@ -370,7 +381,7 @@ export default function WhatsAppInbox() {
       </div>
 
       {/* Container Principal estilo WhatsApp Web */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 bg-white rounded-2xl border border-slate-200 shadow-subtle overflow-hidden min-h-[640px] max-h-[820px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 bg-white rounded-2xl border border-slate-200 shadow-subtle overflow-hidden min-h-[580px] lg:h-[calc(100vh-230px)] lg:max-h-[860px]">
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: LISTA DE CONVERSAS (4 colunas no lg) */}
         {/* ========================================================= */}
@@ -447,7 +458,20 @@ export default function WhatsAppInbox() {
 
           {/* Lista de itens de conversa */}
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-            {loading ? (
+            {loadError && !loading ? (
+              <div className="p-6 text-center space-y-2">
+                <AlertCircle className="h-6 w-6 text-amber-600 mx-auto" />
+                <p className="text-xs text-slate-600">{loadError}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => loadData()}
+                  className="text-xs h-7"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" /> Tentar novamente
+                </Button>
+              </div>
+            ) : loading ? (
               <div className="p-8 text-center text-xs text-slate-400">
                 Carregando conversas da recepção...
               </div>

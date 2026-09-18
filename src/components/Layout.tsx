@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { ErrorBoundary } from './ErrorBoundary'
 
 const pageTitles: Record<string, string> = {
   '/painel': 'Painel Geral',
@@ -38,10 +39,12 @@ export default function Layout() {
         </SheetContent>
       </Sheet>
 
-      <div className="flex flex-1 flex-col md:pl-64">
+      <div className="flex flex-1 flex-col md:pl-64 min-w-0">
         <Header title={title} onOpenMobileNav={() => setMobileNavOpen(true)} />
         <main className="flex-1 p-4 md:p-6 lg:p-8 animate-fade-in max-w-7xl mx-auto w-full">
-          <Outlet />
+          <ErrorBoundary fallbackTitle="Instabilidade na visualização desta tela">
+            <Outlet />
+          </ErrorBoundary>
         </main>
         <footer className="py-4 px-6 text-center text-xs text-slate-400 border-t border-slate-200/60 bg-white/50">
           © Cliap • Pediatria e Imunização • Cuidado pediátrico e atendimento humanizado

@@ -53,15 +53,18 @@ export function isPastDayLocal(dateInput: string | Date | undefined | null): boo
 /**
  * Formata data e hora para exibição amigável em português.
  */
-export function formatAppointmentDateBadge(dateInput: string | Date): {
+export function formatAppointmentDateBadge(dateInput: string | Date | undefined | null): {
   day: number
   monthShort: string
   timeStr: string
   fullDateStr: string
 } {
+  if (!dateInput) {
+    return { day: 0, monthShort: '---', timeStr: '--:--', fullDateStr: 'Data não informada' }
+  }
   const d = new Date(dateInput)
   if (isNaN(d.getTime())) {
-    return { day: 0, monthShort: '', timeStr: '', fullDateStr: '' }
+    return { day: 0, monthShort: '---', timeStr: '--:--', fullDateStr: 'Data inválida' }
   }
 
   return {

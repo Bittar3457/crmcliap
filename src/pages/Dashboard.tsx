@@ -11,6 +11,7 @@ import {
   ArrowRight,
   AlertTriangle,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -36,42 +37,86 @@ export default function Dashboard() {
   const [patientCount, setPatientCount] = useState(0)
   const [pendingMessages, setPendingMessages] = useState<WhatsAppMessage[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const safeTime = (dateStr?: string | Date | null): number => {
+    if (!dateStr) return 0
+    const t = new Date(dateStr).getTime()
+    return isNaN(t) ? 0 : t
+  }
+
+  const formatSafeTime = (dateStr?: string | Date | null): string => {
+    if (!dateStr) return '--:--'
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '--:--'
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const formatSafeDate = (dateStr?: string | Date | null): string => {
+    if (!dateStr) return 'Data não informada'
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return 'Data inválida'
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
 
   const loadData = async () => {
     try {
-      const [appts, vacs, patients, msgs] = await Promise.all([
+      setLoading(true)
+      setLoadError(null)
+
+      // Usa allSettled para garantir que falha em uma coleção não quebre todo o painel
+      const [apptsRes, vacsRes, patientsRes, msgsRes] = await Promise.allSettled([
         getAppointments(),
         getVaccinations(),
         getPatients(),
         getWhatsAppMessages(),
       ])
 
-      setPatientCount(patients.filter((p) => p.active !== false).length)
+      const appts = apptsRes.status === 'fulfilled' ? apptsRes.value || [] : []
+      const vacs = vacsRes.status === 'fulfilled' ? vacsRes.value || [] : []
+      const patients = patientsRes.status === 'fulfilled' ? patientsRes.value || [] : []
+      const msgs = msgsRes.status === 'fulfilled' ? msgsRes.value || [] : []
+
+      // Se todas as consultas principais falharem, registra erro geral
+      const failures = [apptsRes, vacsRes, patientsRes, msgsRes].filter(
+        (r) => r.status === 'rejected',
+      )
+      if (failures.length === 4) {
+        setLoadError(
+          'Serviço temporariamente indisponível. Não foi possível comunicar com o banco de dados.',
+        )
+        return
+      }
+
+      setPatientCount(patients.filter((p) => p && p.active !== false).length)
 
       // 1. Filtrar estritamente agendamentos do dia de hoje no fuso local
       const todayAppts = appts
-        .filter((a) => Boolean(a.date_time && isTodayLocal(a.date_time)))
-        .sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime())
+        .filter((a) => Boolean(a?.date_time && isTodayLocal(a.date_time)))
+        .sort((a, b) => safeTime(a.date_time) - safeTime(b.date_time))
       setTodayAppointments(todayAppts)
 
       // 2. Filtrar consultas atrasadas (data anterior a hoje e status pendente/confirmado)
       const delayed = appts
         .filter((a) => {
-          if (!a.date_time) return false
+          if (!a?.date_time) return false
           const isPast = isPastDayLocal(a.date_time)
           const isPending = a.status === 'agendado' || a.status === 'confirmado'
           return isPast && isPending
         })
-        .sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime())
+        .sort((a, b) => safeTime(b.date_time) - safeTime(a.date_time))
       setDelayedAppointments(delayed)
 
-      const pendingVacs = vacs.filter((v) => v.status === 'agendada' || v.status === 'atrasada')
+      const pendingVacs = vacs.filter(
+        (v) => v && (v.status === 'agendada' || v.status === 'atrasada'),
+      )
       setUpcomingVaccines(pendingVacs.slice(0, 5))
 
-      const drafts = msgs.filter((m) => m.status === 'rascunho' || m.status === 'agendada')
+      const drafts = msgs.filter((m) => m && (m.status === 'rascunho' || m.status === 'agendada'))
       setPendingMessages(drafts)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao carregar dados do dashboard:', err)
+      setLoadError(err?.message || 'Erro ao carregar dados do painel.')
     } finally {
       setLoading(false)
     }
@@ -88,10 +133,14 @@ export default function Dashboard() {
   const handleSendReminder = async (appt: Appointment) => {
     if (!appt.expand?.patient) return
     const patient = appt.expand.patient
-    const dateFormatted = new Date(appt.date_time).toLocaleString('pt-BR', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    })
+    const d = appt.date_time ? new Date(appt.date_time) : null
+    const dateFormatted =
+      d && !isNaN(d.getTime())
+        ? d.toLocaleString('pt-BR', {
+            dateStyle: 'short',
+            timeStyle: 'short',
+          })
+        : 'horário a confirmar'
 
     const messageText = `Olá, ${patient.parent_name || 'Responsável'}! Aqui é da equipe Cliap (Pediatria e Imunização). Lembrete de agendamento para ${patient.full_name}:\n- Data/Hora: ${dateFormatted}\n- Tipo: ${appt.type}\nPor favor, confirme respondendo esta mensagem!\n\nAtenciosamente,\nEquipe Cliap`
 
@@ -130,6 +179,27 @@ export default function Dashboard() {
     if (hour < 12) return 'Bom dia'
     if (hour < 18) return 'Boa tarde'
     return 'Boa noite'
+  }
+
+  if (loadError && !loading) {
+    return (
+      <div className="flex min-h-[460px] flex-col items-center justify-center rounded-2xl border border-amber-200 bg-amber-50/50 p-8 text-center animate-fade-in space-y-4">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 shadow-sm">
+          <AlertTriangle className="h-7 w-7" />
+        </div>
+        <div className="max-w-md space-y-1">
+          <h3 className="text-xl font-bold text-slate-900">Instabilidade temporária de conexão</h3>
+          <p className="text-sm text-slate-600">
+            Não foi possível carregar as informações do Painel no momento. O servidor pode estar se
+            recuperando de uma oscilação de rede.
+          </p>
+        </div>
+        <Button onClick={() => loadData()} className="bg-[#1F3A4D] hover:bg-[#2A4B63] text-white">
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Tentar novamente
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -271,11 +341,8 @@ export default function Dashboard() {
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">
                       <Clock className="h-3 w-3 inline mr-1 text-slate-400" />
-                      {new Date(appt.date_time).toLocaleTimeString('pt-BR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}{' '}
-                      • <span className="capitalize">{appt.type}</span>
+                      {formatSafeTime(appt.date_time)} •{' '}
+                      <span className="capitalize">{appt.type}</span>
                       {appt.expand?.patient?.parent_name && (
                         <span> • Resp: {appt.expand.patient.parent_name}</span>
                       )}
@@ -402,16 +469,15 @@ export default function Dashboard() {
           ) : (
             <div className="divide-y divide-slate-100">
               {delayedAppointments.map((appt) => {
-                const apptDate = new Date(appt.date_time)
-                const realDateFormatted = apptDate.toLocaleDateString('pt-BR', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                })
-                const realTimeFormatted = apptDate.toLocaleTimeString('pt-BR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
+                const apptDate = appt.date_time ? new Date(appt.date_time) : null
+                const isValidDate = apptDate && !isNaN(apptDate.getTime())
+                const monthShort = isValidDate
+                  ? apptDate.toLocaleDateString('pt-BR', { month: 'short' })
+                  : '---'
+                const dayNum = isValidDate ? apptDate.getDate() : '--'
+                const yearNum = isValidDate ? apptDate.getFullYear() : '----'
+                const realDateFormatted = formatSafeDate(appt.date_time)
+                const realTimeFormatted = formatSafeTime(appt.date_time)
 
                 return (
                   <div
@@ -421,14 +487,10 @@ export default function Dashboard() {
                     <div className="flex items-start gap-3">
                       <div className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-lg bg-[#B06A5E]/10 border border-[#B06A5E]/20 text-[#B06A5E] shrink-0 min-w-[72px]">
                         <span className="text-[10px] uppercase font-bold tracking-wider">
-                          {apptDate.toLocaleDateString('pt-BR', { month: 'short' })}
+                          {monthShort}
                         </span>
-                        <span className="text-lg font-extrabold leading-none my-0.5">
-                          {apptDate.getDate()}
-                        </span>
-                        <span className="text-[10px] font-medium text-slate-500">
-                          {apptDate.getFullYear()}
-                        </span>
+                        <span className="text-lg font-extrabold leading-none my-0.5">{dayNum}</span>
+                        <span className="text-[10px] font-medium text-slate-500">{yearNum}</span>
                       </div>
 
                       <div className="min-w-0">
