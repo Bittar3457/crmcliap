@@ -11,7 +11,8 @@ export interface WhatsAppConversationItem {
     content: string
     timestamp: string
     direction: 'enviada' | 'recebida'
-    status?: 'enviada' | 'entregue' | 'lida'
+    status?: 'enviada' | 'entregue' | 'lida' | 'falha'
+    errorNote?: string
   }
 }
 
@@ -23,7 +24,8 @@ export interface WhatsAppChatMessage {
   content: string
   direction: 'enviada' | 'recebida'
   timestamp: string
-  status?: 'enviada' | 'entregue' | 'lida'
+  status?: 'enviada' | 'entregue' | 'lida' | 'falha'
+  errorNote?: string
   senderName?: string
   templateType?: string
 }

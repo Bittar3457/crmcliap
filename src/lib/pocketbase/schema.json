@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-18T20:48:59.768Z",
+  "generatedAt": "2026-09-22T19:02:45.327Z",
   "collections": [
     {
       "name": "users",
@@ -392,7 +392,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["rascunho", "agendada", "enviada"]
+          "selectValues": ["rascunho", "agendada", "enviada", "falha"]
         },
         {
           "name": "created",

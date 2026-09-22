@@ -168,11 +168,21 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="text-center pt-2 text-xs text-slate-500">
-            Ainda não tem conta?{' '}
-            <Link to="/cadastro" className="text-[#1F3A4D] font-semibold hover:underline">
-              Criar nova conta
-            </Link>
+          <div className="text-center pt-2 text-xs text-slate-500 space-y-2">
+            <div>
+              Ainda não tem conta?{' '}
+              <Link to="/cadastro" className="text-[#1F3A4D] font-semibold hover:underline">
+                Criar nova conta
+              </Link>
+            </div>
+            <div className="pt-2 border-t border-slate-100">
+              <Link
+                to="/privacidade"
+                className="text-[11px] text-slate-400 hover:text-slate-600 hover:underline transition-colors"
+              >
+                Política de Privacidade (LGPD)
+              </Link>
+            </div>
           </div>
         </div>
       </div>

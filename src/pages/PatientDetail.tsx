@@ -120,23 +120,31 @@ export default function PatientDetail() {
     if (!quickReply.trim() || !patient) return
     setSendingMsg(true)
     try {
-      const sent = await sendInboxMessage({
+      const result = await sendInboxMessage({
         conversationId: `conv-${patient.id}`,
         phone: patient.phone,
         content: quickReply,
         patientId: patient.id,
         senderName: 'Recepção Cliap',
       })
-      setMessages((prev) => [...prev, sent])
+      setMessages((prev) => [...prev, result.message])
       setQuickReply('')
-      if (waConfig?.status === 'conectado') {
+      if (result.metaFailed) {
+        toast({
+          title: 'Envio recusado pela Meta — Fallback acionado',
+          description:
+            result.error ||
+            'Envio recusado pela Meta Cloud API. Gravado como FALHA no prontuário e aberto no WhatsApp Web.',
+          variant: 'destructive',
+        })
+      } else if (waConfig?.status === 'conectado') {
         toast({
           title: 'Mensagem enviada via WhatsApp Cloud API!',
           description: 'Gravada no prontuário e entregue pela Meta.',
         })
       } else {
         toast({
-          title: 'Mensagem enviada via WhatsApp!',
+          title: 'Mensagem aberta via WhatsApp!',
           description: 'Gravada no prontuário e aberta no WhatsApp oficial.',
         })
       }
@@ -424,10 +432,26 @@ export default function PatientDetail() {
                             {m.content}
                           </p>
 
+                          {m.status === 'falha' && (
+                            <div className="mt-2 pt-1.5 border-t border-rose-200/80 flex items-start gap-1.5 text-[10px] text-rose-700 bg-rose-50/90 rounded-md px-2 py-1">
+                              <span className="font-bold text-[#EF4444]">
+                                Falha no envio pela Meta:
+                              </span>
+                              <span>
+                                {m.errorNote || 'envio recusado pela Meta — aberto no WhatsApp Web'}
+                              </span>
+                            </div>
+                          )}
+
                           <div className="flex items-center justify-end gap-1 mt-1 pt-0.5 text-[9px] text-slate-400">
-                            {isOutbound && (
-                              <CheckCheck className="h-3 w-3 text-emerald-600 inline" />
-                            )}
+                            {isOutbound &&
+                              (m.status === 'falha' ? (
+                                <span className="inline-flex items-center text-[10px] font-bold text-white bg-[#EF4444] px-1.5 py-0.2 rounded-full">
+                                  FALHA
+                                </span>
+                              ) : (
+                                <CheckCheck className="h-3 w-3 text-emerald-600 inline" />
+                              ))}
                           </div>
                         </div>
                       </div>

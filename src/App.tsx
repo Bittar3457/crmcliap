@@ -9,6 +9,7 @@ import Index from '@/pages/Index'
 import Login from '@/pages/Login'
 import Signup from '@/pages/Signup'
 import ResetPassword from '@/pages/ResetPassword'
+import PrivacyPolicy from '@/pages/PrivacyPolicy'
 import Dashboard from '@/pages/Dashboard'
 import Patients from '@/pages/Patients'
 import PatientDetail from '@/pages/PatientDetail'
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/cadastro" element={<Signup />} />
           <Route path="/redefinir-senha" element={<ResetPassword />} />
           <Route path="/redefinir-senha/:token" element={<ResetPassword />} />
+          <Route path="/privacidade" element={<PrivacyPolicy />} />
 
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>

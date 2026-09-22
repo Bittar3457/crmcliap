@@ -100,11 +100,32 @@ export async function testWhatsAppConnection(): Promise<TestConnectionResponse> 
 export async function sendWhatsAppMessageApi(
   payload: SendWhatsAppRealPayload,
 ): Promise<SendWhatsAppRealResponse> {
-  return pb.send<SendWhatsAppRealResponse>('/backend/v1/whatsapp/send', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-    headers: { 'Content-Type': 'application/json' },
-  })
+  try {
+    return await pb.send<SendWhatsAppRealResponse>('/backend/v1/whatsapp/send', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+    })
+  } catch (err: any) {
+    // Quando o backend responde com status HTTP 400 ou 502, pb.send lança ClientResponseError.
+    // Retornamos os dados da resposta com success: false para que o front use o status e erro da Meta.
+    if (err && typeof err === 'object' && err.response) {
+      const resp = err.response as SendWhatsAppRealResponse
+      return {
+        success: false,
+        error: resp.error || err.message || 'Erro no envio da Meta Cloud API',
+        code: resp.code,
+        error_subcode: resp.error_subcode,
+        fallback_available: true,
+        crm_message: resp.crm_message,
+      }
+    }
+    return {
+      success: false,
+      error: err?.message || 'Falha de comunicação com a Meta Cloud API',
+      fallback_available: true,
+    }
+  }
 }
 
 /**

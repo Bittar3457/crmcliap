@@ -216,7 +216,7 @@ export default function WhatsAppInbox() {
 
     setSending(true)
     try {
-      const sent = await sendInboxMessage({
+      const result = await sendInboxMessage({
         conversationId: activeConversation.id,
         phone: activeConversation.phone,
         content: replyText,
@@ -224,19 +224,27 @@ export default function WhatsAppInbox() {
         senderName: 'Recepção Cliap',
       })
 
-      // Atualiza localmente o chat
-      setActiveMessages((prev) => [...prev, sent])
+      // Atualiza localmente o chat com a nova mensagem
+      setActiveMessages((prev) => [...prev, result.message])
       setReplyText('')
 
-      if (waConfig?.status === 'conectado') {
+      if (result.metaFailed) {
+        toast({
+          title: 'Envio recusado pela Meta — Fallback acionado',
+          description:
+            result.error ||
+            'A Meta recusou o envio (modo dev ou número não cadastrado). Aberto no WhatsApp Web e registrado como FALHA no histórico.',
+          variant: 'destructive',
+        })
+      } else if (waConfig?.status === 'conectado') {
         toast({
           title: 'Mensagem enviada com sucesso!',
-          description: 'Processada via WhatsApp Cloud API oficial.',
+          description: 'Entregue via WhatsApp Cloud API oficial.',
         })
       } else {
         toast({
           title: 'WhatsApp aberto com sucesso!',
-          description: 'Mensagem enviada via deep link e gravada no histórico.',
+          description: 'Mensagem aberta via deep link e gravada no histórico.',
         })
       }
 
@@ -245,7 +253,7 @@ export default function WhatsAppInbox() {
       setConversations(updated)
     } catch (err) {
       console.error(err)
-      toast({ title: 'Erro ao enviar mensagem', variant: 'destructive' })
+      toast({ title: 'Erro ao processar envio', variant: 'destructive' })
     } finally {
       setSending(false)
     }
@@ -770,7 +778,23 @@ export default function WhatsAppInbox() {
                             {msg.content}
                           </p>
 
-                          {/* Rodapé do balão: hora exata e checks */}
+                          {/* Alerta visual explícito de FALHA quando Meta recusa envio */}
+                          {msg.status === 'falha' && (
+                            <div className="mt-2 pt-1.5 border-t border-rose-200/80 flex items-start gap-1.5 text-[10px] text-rose-700 bg-rose-50/90 rounded-md px-2 py-1">
+                              <AlertCircle className="h-3.5 w-3.5 text-[#EF4444] shrink-0 mt-0.5" />
+                              <div className="leading-tight">
+                                <span className="font-bold text-[#EF4444]">
+                                  Falha no envio pela Meta:{' '}
+                                </span>
+                                <span>
+                                  {msg.errorNote ||
+                                    'envio recusado pela Meta — aberto no WhatsApp Web'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Rodapé do balão: hora exata e checks ou badge de falha */}
                           <div className="flex items-center justify-end gap-1 mt-1 pt-0.5 text-[9px] text-slate-400">
                             <span>
                               {new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
@@ -778,9 +802,17 @@ export default function WhatsAppInbox() {
                                 minute: '2-digit',
                               })}
                             </span>
-                            {isOutbound && (
-                              <CheckCheck className="h-3 w-3 text-emerald-600 inline" />
-                            )}
+                            {isOutbound &&
+                              (msg.status === 'falha' ? (
+                                <span
+                                  className="inline-flex items-center gap-0.5 text-[10px] font-bold text-white bg-[#EF4444] px-1.5 py-0.2 rounded-full"
+                                  title="Envio recusado pela Meta Cloud API"
+                                >
+                                  FALHA
+                                </span>
+                              ) : (
+                                <CheckCheck className="h-3 w-3 text-emerald-600 inline" />
+                              ))}
                           </div>
                         </div>
                       </div>

@@ -264,6 +264,8 @@ export default function WhatsAppCenter() {
       const isConnected =
         waConfig?.status === 'conectado' && waConfig?.has_token && waConfig?.phone_number_id
       let sentReal = false
+      let metaRefused = false
+      let metaErrorMessage = ''
 
       if (isConnected) {
         try {
@@ -281,38 +283,44 @@ export default function WhatsAppCenter() {
               description: `Entregue via WhatsApp oficial da Cliap para ${patient.parent_name || patient.full_name}.`,
             })
           } else {
+            metaRefused = true
+            metaErrorMessage = apiRes.error || 'Envio recusado pela Meta'
             console.warn('Falha no envio via Meta API, acionando fallback deep link:', apiRes.error)
             toast({
-              title: 'Aviso: Envio pela Cloud API indisponível',
-              description: `${apiRes.error || 'Conta em análise ou limite atingido'}. Abrindo fallback via WhatsApp Web...`,
-              variant: 'default',
+              title: 'Falha no envio pela Meta Cloud API',
+              description: `${metaErrorMessage}. Registrado como FALHA no histórico e aberto no WhatsApp Web.`,
+              variant: 'destructive',
             })
           }
-        } catch (apiErr: unknown) {
+        } catch (apiErr: any) {
+          metaRefused = true
+          metaErrorMessage = apiErr?.message || 'Erro na comunicação com a Meta'
           console.warn('Erro ao chamar API Meta, usando fallback:', apiErr)
           toast({
-            title: 'Erro temporário na Cloud API',
-            description: 'Redirecionando para envio manual via WhatsApp oficial (fallback)...',
+            title: 'Falha no envio pela Cloud API',
+            description: `${metaErrorMessage}. Registrado como FALHA e aberto no WhatsApp Web.`,
+            variant: 'destructive',
           })
         }
       }
 
-      // Se não enviou via Cloud API (ou se falhou/desconectado), usa o deep link com persistência
+      // Se não enviou via Cloud API com sucesso, aciona o deep link com persistência honesta do status
       if (!sentReal) {
+        const statusToSave = metaRefused ? 'falha' : 'enviada'
         await createWhatsAppMessage({
           patient: selectedPatientId,
           direction: 'enviada',
           template: selectedInstructionId || undefined,
           content: messageContent,
           sent_at: new Date().toISOString(),
-          status: 'enviada',
+          status: statusToSave,
         })
 
         openWhatsAppExternal(buildWhatsAppLink(patient.phone, messageContent))
         if (!isConnected) {
           toast({
             title: 'Abrindo WhatsApp (Deep Link)',
-            description: 'A mensagem foi registrada no prontuário do paciente.',
+            description: 'A mensagem foi registrada no histórico do paciente.',
           })
         }
       }
@@ -659,16 +667,29 @@ export default function WhatsAppCenter() {
                     <p className="text-slate-800 whitespace-pre-line leading-relaxed">
                       {m.content}
                     </p>
+
+                    {m.status === 'falha' && (
+                      <div className="text-[10px] text-rose-700 bg-rose-50 border border-rose-200 rounded p-1.5 flex items-start gap-1">
+                        <AlertTriangle className="h-3 w-3 text-[#EF4444] shrink-0 mt-0.5" />
+                        <span>
+                          <strong className="text-[#EF4444]">Falha no envio:</strong> envio recusado
+                          pela Meta — aberto no WhatsApp Web
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between pt-1 border-t border-slate-100">
                       <span className="capitalize text-slate-500">{m.direction}</span>
                       <span
                         className={`font-semibold px-2 py-0.5 rounded text-[10px] ${
                           m.status === 'enviada'
                             ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
+                            : m.status === 'falha'
+                              ? 'bg-rose-100 text-[#EF4444] border border-rose-200 font-bold'
+                              : 'bg-amber-100 text-amber-800'
                         }`}
                       >
-                        {m.status}
+                        {m.status === 'falha' ? 'FALHA' : m.status}
                       </span>
                     </div>
                   </div>

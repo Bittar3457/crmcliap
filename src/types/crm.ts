@@ -75,7 +75,7 @@ export interface CareInstruction {
 }
 
 export type MessageDirection = 'enviada' | 'recebida'
-export type MessageStatus = 'rascunho' | 'agendada' | 'enviada'
+export type MessageStatus = 'rascunho' | 'agendada' | 'enviada' | 'falha'
 
 export interface WhatsAppMessage {
   id: string

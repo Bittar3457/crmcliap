@@ -82,7 +82,8 @@ routerAdd(
     const resData = metaRes.json || {}
 
     if (!isSuccess) {
-      // Ex.: conta em análise, sem forma de pagamento, template exigido fora da janela de 24h
+      // Ex.: conta em análise, sem forma de pagamento, template exigido fora da janela de 24h,
+      // ou número fora da lista de destinatários permitidos em modo dev
       const metaError = resData.error || {}
       const errMsg =
         metaError.message ||
@@ -102,6 +103,51 @@ routerAdd(
 
       $app.logger().warn('WhatsApp Cloud API send failed: code=' + errCode + ', msg=' + errMsg)
 
+      // Registra no histórico como FALHA (honestidade no histórico solicitada pelo usuário)
+      let failedMsg = null
+      try {
+        const col = $app.findCollectionByNameOrId('whatsapp_messages')
+        const msgRec = new Record(col)
+
+        if (patientId) {
+          msgRec.set('patient', patientId)
+        } else {
+          try {
+            const rawDigits = toPhone.replace(/\D/g, '')
+            const shortDigits = rawDigits.startsWith('55') ? rawDigits.slice(2) : rawDigits
+            const pts = $app.findRecordsByFilter('patients', 'phone ~ {:p}', '-created', 1, 0, {
+              p: shortDigits.slice(-8),
+            })
+            if (pts && pts.length > 0) {
+              msgRec.set('patient', pts[0].id)
+            }
+          } catch (_) {}
+        }
+
+        if (templateId) {
+          msgRec.set('template', templateId)
+        }
+        msgRec.set('direction', 'enviada')
+        msgRec.set('content', messageText)
+        msgRec.set('sent_at', new Date().toISOString())
+        msgRec.set('status', 'falha')
+
+        $app.save(msgRec)
+        failedMsg = {
+          id: msgRec.id,
+          patient: msgRec.getString('patient'),
+          direction: 'enviada',
+          content: messageText,
+          sent_at: msgRec.getString('sent_at'),
+          status: 'falha',
+          error_note: 'envio recusado pela Meta — aberto no WhatsApp Web',
+        }
+      } catch (saveErr) {
+        $app
+          .logger()
+          .error('Erro ao registrar mensagem com falha na collection', 'error', String(saveErr))
+      }
+
       return e.json(400, {
         success: false,
         error: errMsg,
@@ -109,6 +155,7 @@ routerAdd(
         error_subcode: errSubcode,
         details: metaError,
         fallback_available: true,
+        crm_message: failedMsg,
       })
     }
 

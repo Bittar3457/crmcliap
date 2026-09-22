@@ -85,6 +85,9 @@ export default function Appointments() {
     try {
       // Se tiver Cloud API conectada, tenta envio direto
       let sentReal = false
+      let metaRefused = false
+      let metaErrMsg = ''
+
       if (waConfig?.status === 'conectado' && waConfig.has_token && waConfig.phone_number_id) {
         try {
           const apiRes = await sendWhatsAppMessageApi({
@@ -98,25 +101,41 @@ export default function Appointments() {
               title: 'Confirmação enviada via WhatsApp Cloud API!',
               description: `Mensagem entregue com sucesso para ${patient.parent_name || patient.full_name}.`,
             })
+          } else {
+            metaRefused = true
+            metaErrMsg =
+              apiRes.error || 'A Meta recusou o envio (modo dev ou número não cadastrado)'
+            console.warn('Falha na Cloud API, acionando fallback:', apiRes.error)
           }
-        } catch (e) {
+        } catch (e: any) {
+          metaRefused = true
+          metaErrMsg = e?.message || 'Falha na comunicação com a Cloud API'
           console.warn('Falha na Cloud API, acionando fallback:', e)
         }
       }
 
-      // Se não enviou via Cloud API, aciona sendInboxMessage com deep link
+      // Se não enviou via Cloud API, aciona sendInboxMessage com deep link e marca status correto
       if (!sentReal) {
-        await sendInboxMessage({
+        const result = await sendInboxMessage({
           conversationId: `conv-${patient.id}`,
           phone: patient.phone,
           content: interpolated,
           patientId: patient.id,
           senderName: 'Recepção Cliap',
         })
-        toast({
-          title: 'Confirmação enviada via WhatsApp (Deep Link)!',
-          description: `Template disparado para ${patient.parent_name || patient.full_name}.`,
-        })
+
+        if (metaRefused || result.metaFailed) {
+          toast({
+            title: 'Envio recusado pela Meta — Fallback acionado',
+            description: `${metaErrMsg || result.error || 'Recusado pela Meta'}. Mensagem registrada como FALHA e aberta no WhatsApp Web.`,
+            variant: 'destructive',
+          })
+        } else {
+          toast({
+            title: 'Confirmação aberta via WhatsApp (Deep Link)',
+            description: `Template disparado para ${patient.parent_name || patient.full_name}.`,
+          })
+        }
       }
 
       // Atualiza o agendamento marcando lembrete gerado

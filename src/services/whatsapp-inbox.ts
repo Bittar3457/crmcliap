@@ -145,6 +145,7 @@ export async function getInboxConversations(
     const norm = normalizePhoneDigits(p.phone)
     const existing = conversationMap.get(norm)
 
+    const isFalha = pbMsg.status === 'falha'
     const chatMsg: WhatsAppChatMessage = {
       id: `pb-${pbMsg.id}`,
       conversationId: existing?.id || `conv-${norm}`,
@@ -153,7 +154,8 @@ export async function getInboxConversations(
       content: pbMsg.content,
       direction: pbMsg.direction || 'enviada',
       timestamp: pbMsg.sent_at || pbMsg.created,
-      status: 'enviada',
+      status: isFalha ? 'falha' : 'enviada',
+      errorNote: isFalha ? 'envio recusado pela Meta — aberto no WhatsApp Web' : undefined,
       senderName: pbMsg.direction === 'enviada' ? 'Recepção Cliap' : p.parent_name || p.full_name,
     }
 
@@ -252,6 +254,7 @@ export async function getConversationMessages(
       try {
         const pbMsgs = await getWhatsAppMessages(patientId)
         for (const pbMsg of pbMsgs) {
+          const isFalha = pbMsg.status === 'falha'
           const chatMsg: WhatsAppChatMessage = {
             id: `pb-${pbMsg.id}`,
             conversationId: conversationId,
@@ -260,7 +263,8 @@ export async function getConversationMessages(
             content: pbMsg.content,
             direction: pbMsg.direction || 'enviada',
             timestamp: pbMsg.sent_at || pbMsg.created,
-            status: 'enviada',
+            status: isFalha ? 'falha' : 'enviada',
+            errorNote: isFalha ? 'envio recusado pela Meta — aberto no WhatsApp Web' : undefined,
             senderName: pbMsg.direction === 'enviada' ? 'Recepção Cliap' : 'Responsável',
           }
           const exists = all.some(
@@ -295,26 +299,14 @@ export async function sendInboxMessage(params: {
   content: string
   patientId?: string
   senderName?: string
-}): Promise<WhatsAppChatMessage> {
+}): Promise<{ message: WhatsAppChatMessage; metaFailed: boolean; error?: string }> {
   const { conversationId, phone, content, patientId, senderName } = params
 
-  const newMessage: WhatsAppChatMessage = {
-    id: `msg-crm-${Date.now()}`,
-    conversationId,
-    patientId,
-    phone,
-    content,
-    direction: 'enviada',
-    timestamp: new Date().toISOString(),
-    status: 'enviada',
-    senderName: senderName || 'Recepção Cliap',
-  }
-
-  // 1. Salva localmente para feedback imediato na UI da Inbox
-  saveLocalCustomMessage(newMessage)
-
-  // 2. Checa se a integração Meta Cloud API está conectada
+  // 1. Checa se a integração Meta Cloud API está conectada
   let sentReal = false
+  let metaRefused = false
+  let metaErrorMessage = ''
+
   try {
     const config = await getWhatsAppConfig().catch(() => null)
     if (config?.status === 'conectado' && config?.has_token && config?.phone_number_id) {
@@ -326,15 +318,43 @@ export async function sendInboxMessage(params: {
       if (res.success) {
         sentReal = true
       } else {
-        console.warn('Envio via Meta Cloud API falhou, acionando fallback wa.me:', res.error)
+        metaRefused = true
+        metaErrorMessage = res.error || 'Envio recusado pela Meta Cloud API'
+        console.warn(
+          'Envio via Meta Cloud API falhou/recusado, acionando fallback wa.me:',
+          res.error,
+        )
       }
     }
-  } catch (err) {
+  } catch (err: any) {
+    metaRefused = true
+    metaErrorMessage = err?.message || 'Falha de comunicação com a Meta Cloud API'
     console.warn('Erro ao verificar/enviar via Meta Cloud API:', err)
   }
 
-  // 3. Se não enviou via Cloud API (ou se falhou), persiste no banco e aciona deep link
+  const finalStatus: 'enviada' | 'falha' = metaRefused ? 'falha' : 'enviada'
+  const errorNote = metaRefused ? 'envio recusado pela Meta — aberto no WhatsApp Web' : undefined
+
+  const newMessage: WhatsAppChatMessage = {
+    id: `msg-crm-${Date.now()}`,
+    conversationId,
+    patientId,
+    phone,
+    content,
+    direction: 'enviada',
+    timestamp: new Date().toISOString(),
+    status: finalStatus,
+    errorNote,
+    senderName: senderName || 'Recepção Cliap',
+  }
+
+  // 2. Salva localmente para feedback na UI da Inbox
+  saveLocalCustomMessage(newMessage)
+
+  // 3. Se não enviou via Cloud API com sucesso, aciona fallback
   if (!sentReal) {
+    // Se a Meta recusou, o endpoint do backend /backend/v1/whatsapp/send já pode ter registrado como 'falha',
+    // mas se o backend não gravou (ex.: paciente não passado ou erro de rede), gravamos explicitamente com status 'falha':
     if (patientId) {
       try {
         await createWhatsAppMessage({
@@ -342,7 +362,7 @@ export async function sendInboxMessage(params: {
           direction: 'enviada',
           content,
           sent_at: new Date().toISOString(),
-          status: 'enviada',
+          status: finalStatus,
         })
       } catch (e) {
         console.warn('Erro ao sincronizar mensagem no PocketBase:', e)
@@ -353,7 +373,7 @@ export async function sendInboxMessage(params: {
     openWhatsAppExternal(waUrl)
   }
 
-  return newMessage
+  return { message: newMessage, metaFailed: metaRefused, error: metaErrorMessage }
 }
 
 /**
